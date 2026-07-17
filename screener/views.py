@@ -444,12 +444,6 @@ def recruiter_dashboard(request):
             cand.is_suspicious = True
             cand.suspicious_reasons.append(f"Suspicious email domain: @{email_domain} (disposable/test provider).")
 
-        # 2. Resume Format Validation (Rule 11)
-        word_count = len(cand.resume_text.split())
-        if word_count < 100:
-            cand.is_suspicious = True
-            cand.suspicious_reasons.append(f"Resume Format Anomaly: Resume text body is too brief ({word_count} words; must be >100).")
-
         # 3. Keyword Stuffing / Spam Validation (Rules 21, 28, 30, 35)
         if len(candidate_skills) > 20:
             cand.is_suspicious = True
