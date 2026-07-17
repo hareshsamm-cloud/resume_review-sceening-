@@ -319,9 +319,32 @@ def recruiter_dashboard(request):
     top_candidates = scanned_candidates[:target_count]
     other_candidates = scanned_candidates[target_count:]
     
+    # Anomaly Detection Heuristics for Fraud Verification
+    for cand in list(top_candidates) + list(other_candidates) + list(accepted_candidates) + list(rejected_candidates):
+        cand.is_suspicious = False
+        cand.suspicious_reasons = []
+        
+        candidate_skills = [s.strip() for s in cand.skills.split(',') if s.strip()]
+        
+        # Heuristic 1: Keyword Stuffing (excessive tech stack keywords)
+        if len(candidate_skills) > 9:
+            cand.is_suspicious = True
+            cand.suspicious_reasons.append(f"Abnormally high skill density ({len(candidate_skills)} unique frameworks). Potential keyword stuffing.")
+            
+        # Heuristic 2: Senior target role experience mismatch
+        current_role_title = JOB_ROLES.get(selected_role_key, {}).get("title", "")
+        if ("Architect" in current_role_title or "Lead" in current_role_title or "Senior" in current_role_title) and cand.experience_years < 2.0:
+            cand.is_suspicious = True
+            cand.suspicious_reasons.append(f"Targeting a senior/architect role with only {cand.experience_years} years of parsed experience.")
+            
+        # Heuristic 3: Missing primary contact details
+        if cand.email == "No email found" or cand.phone == "No phone found":
+            cand.is_suspicious = True
+            cand.suspicious_reasons.append("Missing primary candidate contact details (Email/Phone).")
+
     avg_score = round(sum(c.match_score for c in all_candidates) / total_count) if total_count > 0 else 0
     strong_count = all_candidates.filter(match_score__gte=80).count()
-    
+
     context = {
         'candidates': top_candidates,
         'other_candidates': other_candidates,
