@@ -409,21 +409,33 @@ def recruiter_dashboard(request):
         cand.is_suspicious = False
         cand.suspicious_reasons = []
         
-        # Heuristic 1: Keyword Stuffing (excessive tech stack keywords)
-        if len(candidate_skills) > 9:
+        # 1. Personal Information Validation Rules (Rules 1, 3, 4, 5, 6)
+        if cand.name.strip() == "":
             cand.is_suspicious = True
-            cand.suspicious_reasons.append(f"Abnormally high skill density ({len(candidate_skills)} unique frameworks). Potential keyword stuffing.")
-            
-        # Heuristic 2: Senior target role experience mismatch
-        current_role_title = JOB_ROLES.get(selected_role_key, {}).get("title", "")
-        if ("Architect" in current_role_title or "Lead" in current_role_title or "Senior" in current_role_title) and cand.experience_years < 2.0:
+            cand.suspicious_reasons.append("Personal Info Anomaly: Candidate name field is empty.")
+        elif not re.match(r'^[a-zA-Z\s\.]+$', cand.name):
             cand.is_suspicious = True
-            cand.suspicious_reasons.append(f"Targeting a senior/architect role with only {cand.experience_years} years of parsed experience.")
-            
-        # Heuristic 3: Missing primary contact details
-        if cand.email == "No email found" or cand.phone == "No phone found":
+            cand.suspicious_reasons.append("Personal Info Anomaly: Candidate name contains invalid special characters.")
+
+        if cand.email != "No email found":
+            if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', cand.email):
+                cand.is_suspicious = True
+                cand.suspicious_reasons.append(f"Personal Info Anomaly: Invalid email formatting syntax ('{cand.email}').")
+        else:
             cand.is_suspicious = True
-            cand.suspicious_reasons.append("Missing primary candidate contact details (Email/Phone).")
+            cand.suspicious_reasons.append("Missing primary contact details (No email address found).")
+
+        if cand.phone != "No phone found":
+            if any(c.isalpha() for c in cand.phone):
+                cand.is_suspicious = True
+                cand.suspicious_reasons.append("Personal Info Anomaly: Phone number contains invalid letters.")
+            phone_digits = "".join(c for c in cand.phone if c.isdigit())
+            if len(phone_digits) < 10 or len(phone_digits) > 15:
+                cand.is_suspicious = True
+                cand.suspicious_reasons.append(f"Personal Info Anomaly: Phone digit length is invalid (must be 10-15 digits, parsed {len(phone_digits)}).")
+        else:
+            cand.is_suspicious = True
+            cand.suspicious_reasons.append("Missing primary contact details (No phone number found).")
 
         # Heuristic 4: Suspicious/Disposable Email Domain
         suspicious_domains = ["example.com", "test.com", "temp.com", "mailinator.com", "yopmail.com", "tempmail.com"]
@@ -432,16 +444,56 @@ def recruiter_dashboard(request):
             cand.is_suspicious = True
             cand.suspicious_reasons.append(f"Suspicious email domain: @{email_domain} (disposable/test provider).")
 
-        # Heuristic 5: Timeline Plausibility Anomaly (Inflated GenAI experience)
+        # 2. Resume Format Validation (Rule 11)
+        word_count = len(cand.resume_text.split())
+        if word_count < 100:
+            cand.is_suspicious = True
+            cand.suspicious_reasons.append(f"Resume Format Anomaly: Resume text body is too brief ({word_count} words; must be >100).")
+
+        # 3. Keyword Stuffing / Spam Validation (Rules 21, 28, 30, 35)
+        if len(candidate_skills) > 9:
+            cand.is_suspicious = True
+            cand.suspicious_reasons.append(f"Keyword Stuffing Anomaly: Abnormally high skill density ({len(candidate_skills)} unique frameworks).")
+
+        # Check for 3+ consecutive repeating identical words (e.g. "Google Google Google")
+        if re.search(r'\b(\w+)\s+\1\s+\1\b', cand.resume_text.lower()):
+            cand.is_suspicious = True
+            cand.suspicious_reasons.append("Keyword Stuffing Anomaly: Found 3+ consecutive repeating identical words (Stuffer pattern).")
+
+        # Buzzword abuse checker
+        buzzwords = ["guru", "rockstar", "ninja", "legend", "visionary"]
         resume_lower = cand.resume_text.lower()
-        genai_buzzwords = ["chatgpt", "gpt-4", "prompt engineering", "langchain", "llama"]
-        if any(buzz in resume_lower for buzz in genai_buzzwords) and cand.experience_years > 4.0:
+        matched_buzz = [b for b in buzzwords if re.search(rf"\b{b}\b", resume_lower)]
+        if matched_buzz:
+            cand.is_suspicious = True
+            cand.suspicious_reasons.append(f"Buzzword Anomaly: Resume contains clickbait/abuse buzzwords ({', '.join(matched_buzz)}).")
+
+        # 4. Certification Timeline & Plausibility Validation (Rule 73)
+        tech_release_years = {
+            "React": 2013,
+            "Docker": 2013,
+            "Kubernetes": 2014,
+            "TensorFlow": 2015,
+            "PyTorch": 2016,
+            "Flutter": 2017,
+            "LangChain": 2022,
+            "ChatGPT": 2022
+        }
+        for tech, release_year in tech_release_years.items():
+            # Check for patterns like "React certification in 2008"
+            pattern = rf"{tech.lower()}[^.\n]*?\b(19\d{{2}}|200\d|201[0-2])\b"
+            if re.search(pattern, resume_lower):
+                cand.is_suspicious = True
+                cand.suspicious_reasons.append(f"Certification Timeline Anomaly: Claims certification or expertise in {tech} before its release year ({release_year}).")
+
+        # Heuristic: Timeline Plausibility Anomaly (ChatGPT/GenAI years check)
+        if any(buzz in resume_lower for buzz in ["chatgpt", "gpt-4", "prompt engineering", "langchain", "llama"]) and cand.experience_years > 4.0:
             regex_genai = r'(?:4|5|6|7|8|9|\d{2,})\+?\s*(?:years?|yrs?)[^.\n]*(?:chatgpt|gpt-4|prompt engineering|langchain|llama|generative ai)'
             if re.search(regex_genai, resume_lower):
                 cand.is_suspicious = True
-                cand.suspicious_reasons.append("Timeline Anomaly: Claims >4 years of experience in post-2022 Generative AI/LLMs.")
+                cand.suspicious_reasons.append("Certification Timeline Anomaly: Claims >4 years of experience in post-2022 Generative AI/LLMs.")
 
-        # Heuristic 6: Cross-Domain Tech Conflict (Conflicting profiles)
+        # Heuristic: Cross-Domain Tech Conflict (Rule 36)
         web_skills = {"react", "typescript", "html", "css", "vue", "angular"}
         ai_skills = {"pytorch", "tensorflow", "deep learning", "machine learning", "nlp"}
         blockchain_skills = {"solidity", "ethereum", "smart contracts", "web3"}
@@ -455,7 +507,13 @@ def recruiter_dashboard(request):
         
         if active_domains >= 3:
             cand.is_suspicious = True
-            cand.suspicious_reasons.append(f"Multi-Stack Anomaly: Claims expert proficiency in {active_domains} unrelated domains (Web, AI, Blockchain, Game Dev).")
+            cand.suspicious_reasons.append(f"Multi-Stack Anomaly: Claims expert proficiency in {active_domains} unrelated tech domains (Web, AI, Blockchain, Game Dev).")
+
+        # Heuristic: Senior target role experience mismatch (Rule 40/63)
+        current_role_title = JOB_ROLES.get(selected_role_key, {}).get("title", "")
+        if ("Architect" in current_role_title or "Lead" in current_role_title or "Senior" in current_role_title) and cand.experience_years < 2.0:
+            cand.is_suspicious = True
+            cand.suspicious_reasons.append(f"Seniority Mismatch Anomaly: Targeting a senior/architect role with only {cand.experience_years} years of experience.")
 
     # In-memory partitioning to preserve properties
     scanned_candidates = [c for c in all_candidates if c.decision == "Pending"]
