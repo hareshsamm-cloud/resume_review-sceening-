@@ -152,6 +152,11 @@ def recruiter_dashboard(request):
             
         return redirect('recruiter_dashboard')
 
+    elif request.method == 'POST' and 'unload_demo' in request.POST:
+        Candidate.objects.all().delete()
+        EmailLog.objects.all().delete()
+        return redirect('recruiter_dashboard')
+
     elif request.method == 'POST' and 'load_demo' in request.POST:
         # Load preset demo resumes for immediate mock previewing
         Candidate.objects.all().delete()

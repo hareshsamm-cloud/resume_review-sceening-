@@ -81,13 +81,16 @@
             <i data-lucide="refresh-cw" style="width: 16px; height: 16px;"></i> Apply Criteria / Recalculate
           </button>
           
+          <button type="submit" name="upload_resumes" class="btn btn-secondary" style="width: 100%;">
+            <i data-lucide="cpu" style="width: 16px; height: 16px;"></i> Scan Resumes
+          </button>
+          
           <div style="display: flex; gap: 12px;">
-            <button type="submit" name="upload_resumes" class="btn btn-secondary" style="flex: 1;">
-              <i data-lucide="cpu" style="width: 16px; height: 16px;"></i> Scan Resumes
-            </button>
-            
             <button type="submit" name="load_demo" class="btn btn-secondary" style="flex: 1;">
               <i data-lucide="database" style="width: 16px; height: 16px;"></i> Load Mock
+            </button>
+            <button type="submit" name="unload_demo" class="btn btn-danger-outline" style="flex: 1; border: 1px solid var(--danger); background: transparent; color: var(--danger); border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; transition: var(--transition-smooth);" onmouseover="this.style.background='var(--danger-glow)'" onmouseout="this.style.background='transparent'">
+              <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i> Unload Mock
             </button>
           </div>
         </div>
