@@ -8,6 +8,7 @@ from django.core.mail import send_mail
 from .models import Candidate, EmailLog
 from .parser import extract_text_from_pdf, parse_resume_full
 from .recommender import get_company_recommendations_by_role
+from .companies_data import COMPANIES_DATABASE
 
 from .roles_data import ROLES_DATABASE
 
@@ -591,7 +592,8 @@ def student_dashboard(request):
         'aspirational': aspirational,
         'summary_highlight': summary_highlight,
         'job_roles': JOB_ROLES,
-        'target_role': target_role
+        'target_role': target_role,
+        'companies': COMPANIES_DATABASE
     }
     return render(request, 'screener/student.html', context)
 

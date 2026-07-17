@@ -202,7 +202,233 @@
       <p style="margin-top: 8px; font-size: 14px;">Upload your PDF/TXT resume or load the "Demo Profile" to receive dynamic feedback, company compatibility scores, and personalized career roadmaps.</p>
     </div>
   {% endif %}
+
+  <!-- College Placement Directory (200+ Software Companies) -->
+  <div class="glass-card" style="margin-top: 40px; padding: 24px;">
+    <h3 class="section-title" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+      <i data-lucide="building" style="color: var(--accent-purple); width: 22px; height: 22px;"></i>
+      🏛️ College Placement Dashboard (210 Target Companies)
+    </h3>
+    <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 24px;">
+      Explore hiring requirement metrics, required technology skills, experience targets, and average salaries across High (Green), Mid (Orange), and Low (Red) tier recruiter targets.
+    </p>
+
+    <!-- Search & Tier Filter Row -->
+    <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px;">
+      <input type="text" id="company-search-input" class="form-input" placeholder="🔍 Search companies by name or skill tags (e.g. Python, SQL, React)..." oninput="handleCompanySearch(this.value)">
+      
+      <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+        <button class="filter-btn active" data-tier="all" onclick="filterCompanies('all')">
+          <i data-lucide="layers" style="width: 14px; height: 14px;"></i> All Targets (210)
+        </button>
+        <button class="filter-btn" data-tier="High" onclick="filterCompanies('High')" style="border-color: rgba(16, 185, 129, 0.3);">
+          <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981; margin-right: 4px;"></span>
+          High Tier (70)
+        </button>
+        <button class="filter-btn" data-tier="Mid" onclick="filterCompanies('Mid')" style="border-color: rgba(245, 158, 11, 0.3);">
+          <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; margin-right: 4px;"></span>
+          Mid Tier (70)
+        </button>
+        <button class="filter-btn" data-tier="Low" onclick="filterCompanies('Low')" style="border-color: rgba(239, 68, 68, 0.3);">
+          <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; margin-right: 4px;"></span>
+          Low Tier (70)
+        </button>
+      </div>
+    </div>
+
+    <!-- Company Grid -->
+    <div class="placement-grid">
+      {% for comp in companies %}
+        <div class="placement-company-card" data-tier="{{ comp.tier }}" data-name="{{ comp.name }}" data-skills="{% for skill in comp.skills %}{{ skill }},{% endfor %}">
+          <div>
+            <!-- Header section -->
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <div class="company-logo-avatar tier-{{ comp.tier_color }}">
+                  {{ comp.initials }}
+                </div>
+                <div>
+                  <h4 style="font-size: 16px; font-weight: 700; color: var(--text-primary);">{{ comp.name }}</h4>
+                  <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: {% if comp.tier == 'High' %}#10b981{% elif comp.tier == 'Mid' %}#f59e0b{% else %}#ef4444{% endif %};">
+                    {{ comp.tier }} Tier
+                  </span>
+                </div>
+              </div>
+              <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); background: var(--bg-tertiary); padding: 4px 8px; border-radius: 6px;">
+                {{ comp.salary }}
+              </span>
+            </div>
+
+            <!-- Description -->
+            <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-bottom: 16px;">
+              {{ comp.description }}
+            </p>
+
+            <!-- Metadata parameters Grid -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px 15px; background: rgba(255,255,255,0.01); border: 1px solid var(--glass-border); padding: 10px; border-radius: 8px; margin-bottom: 16px;">
+              <div style="font-size: 11px;">
+                <span style="color: var(--text-tertiary); display: block;">Experience</span>
+                <strong style="color: var(--text-secondary);">{{ comp.experience }}</strong>
+              </div>
+              <div style="font-size: 11px;">
+                <span style="color: var(--text-tertiary); display: block;">GPA Criteria</span>
+                <strong style="color: var(--text-secondary);">{{ comp.gpa }}</strong>
+              </div>
+              <div style="font-size: 11px; grid-column: span 2;">
+                <span style="color: var(--text-tertiary); display: block;">Interview Rounds</span>
+                <strong style="color: var(--text-secondary); font-size: 10.5px;">{{ comp.rounds }}</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- Required skills -->
+          <div>
+            <span style="font-size: 11px; color: var(--text-tertiary); display: block; margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Target Tech Stack</span>
+            <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+              {% for skill in comp.skills %}
+                <span class="skill-badge" style="font-size: 10px; padding: 2px 6px; background: rgba(255,255,255,0.02); border-color: var(--glass-border); color: var(--text-secondary);">{{ skill }}</span>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
 </div>
+
+<style>
+  .placement-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+  }
+  .placement-company-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 20px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    transition: var(--transition-smooth);
+  }
+  .placement-company-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+  }
+  .company-logo-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .company-logo-avatar.tier-green {
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+    border-color: rgba(16, 185, 129, 0.3);
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.15);
+  }
+  .company-logo-avatar.tier-orange {
+    background: rgba(245, 158, 11, 0.12);
+    color: #f59e0b;
+    border-color: rgba(245, 158, 11, 0.3);
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.15);
+  }
+  .company-logo-avatar.tier-red {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.3);
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.15);
+  }
+  .filter-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--glass-border);
+    color: var(--text-secondary);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .filter-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+  }
+  .filter-btn.active {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: var(--accent-blue);
+    color: var(--text-primary);
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+  }
+</style>
+
+<script>
+  function filterCompanies(tier) {
+    // Update active filter button styling
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.classList.remove('active');
+    });
+    
+    // Find matching button to activate
+    const currentBtn = Array.from(document.querySelectorAll('.filter-btn')).find(btn => btn.dataset.tier === tier);
+    if (currentBtn) {
+      currentBtn.classList.add('active');
+    }
+    
+    const searchInput = document.getElementById('company-search-input');
+    const term = searchInput.value.toLowerCase().trim();
+    
+    const cards = document.querySelectorAll('.placement-company-card');
+    cards.forEach(card => {
+      const cardTier = card.dataset.tier;
+      const cardName = card.dataset.name.toLowerCase();
+      const cardSkills = card.dataset.skills.toLowerCase();
+      
+      const matchesTier = (tier === 'all' || cardTier === tier);
+      const matchesSearch = (term === '' || cardName.includes(term) || cardSkills.includes(term));
+      
+      if (matchesTier && matchesSearch) {
+        card.style.display = 'flex';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  }
+
+  function handleCompanySearch(term) {
+    const activeBtn = document.querySelector('.filter-btn.active');
+    const tier = activeBtn ? activeBtn.dataset.tier : 'all';
+    
+    const cleanTerm = term.toLowerCase().trim();
+    const cards = document.querySelectorAll('.placement-company-card');
+    
+    cards.forEach(card => {
+      const cardTier = card.dataset.tier;
+      const cardName = card.dataset.name.toLowerCase();
+      const cardSkills = card.dataset.skills.toLowerCase();
+      
+      const matchesTier = (tier === 'all' || cardTier === tier);
+      const matchesSearch = (cleanTerm === '' || cardName.includes(cleanTerm) || cardSkills.includes(cleanTerm));
+      
+      if (matchesTier && matchesSearch) {
+        card.style.display = 'flex';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  }
+</script>
 
 <script>
   function updateFileName(input) {
