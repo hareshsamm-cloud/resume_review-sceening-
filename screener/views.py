@@ -714,3 +714,12 @@ def send_decision_email(request, candidate_id, decision_type):
         messages.success(request, f"Email notification sent to {candidate.name} ({decision_type})!")
         
     return redirect('recruiter_dashboard')
+
+def college_dashboard(request):
+    """
+    College Placement & Partner Management Dashboard.
+    """
+    context = {
+        'companies': COMPANIES_DATABASE,
+    }
+    return render(request, 'screener/college.html', context)

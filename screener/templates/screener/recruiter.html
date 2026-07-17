@@ -3,8 +3,11 @@
 {% block title %}ResumeSphere AI - Recruiter Dashboard{% endblock %}
 
 {% block nav_actions %}
-<a href="{% url 'student_dashboard' %}" class="btn btn-primary">
+<a href="{% url 'student_dashboard' %}" class="btn btn-secondary" style="margin-right: 10px;">
   <i data-lucide="graduation-cap" style="width: 16px; height: 16px;"></i> Student Space
+</a>
+<a href="{% url 'college_dashboard' %}" class="btn btn-primary">
+  <i data-lucide="building" style="width: 16px; height: 16px;"></i> College Space
 </a>
 {% endblock %}
 
