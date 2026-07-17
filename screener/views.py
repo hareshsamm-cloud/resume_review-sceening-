@@ -266,9 +266,9 @@ def recruiter_dashboard(request):
                 "name": "Lucas Vance",
                 "email": "lucas.vance@outlook.com",
                 "phone": "+1 (555) 901-1234",
-                "skills": "React,TypeScript,HTML,CSS,Node.js,Django,PostgreSQL,AWS,Docker,Kubernetes,PyTorch,Solidity,Unity,C#,Terraform,Git",
+                "skills": "React,TypeScript,HTML,CSS,Node.js,Django,PostgreSQL,AWS,Docker,Kubernetes,PyTorch,Solidity,Unity,C#,Terraform,Git,Redux,Next.js,Vue,Angular,Flutter,GraphQL",
                 "experience_years": 3.2,
-                "resume_text": "Resume of Lucas Vance. Claims expert mastery in React, TypeScript, HTML, CSS, Node.js, Django, PostgreSQL, AWS, Docker, Kubernetes, PyTorch, Solidity, Unity, C#, Terraform, Git."
+                "resume_text": "Resume of Lucas Vance. Claims expert mastery in React, TypeScript, HTML, CSS, Node.js, Django, PostgreSQL, AWS, Docker, Kubernetes, PyTorch, Solidity, Unity, C#, Terraform, Git, Redux, Next.js, Vue, Angular, Flutter, GraphQL."
             },
             {
                 "name": "Sophia Chen",
@@ -451,9 +451,9 @@ def recruiter_dashboard(request):
             cand.suspicious_reasons.append(f"Resume Format Anomaly: Resume text body is too brief ({word_count} words; must be >100).")
 
         # 3. Keyword Stuffing / Spam Validation (Rules 21, 28, 30, 35)
-        if len(candidate_skills) > 9:
+        if len(candidate_skills) > 20:
             cand.is_suspicious = True
-            cand.suspicious_reasons.append(f"Keyword Stuffing Anomaly: Abnormally high skill density ({len(candidate_skills)} unique frameworks).")
+            cand.suspicious_reasons.append(f"Keyword Stuffing Anomaly: Abnormally high skill density ({len(candidate_skills)} unique frameworks; limit is 20).")
 
         # Check for 3+ consecutive repeating identical words (e.g. "Google Google Google")
         if re.search(r'\b(\w+)\s+\1\s+\1\b', cand.resume_text.lower()):
