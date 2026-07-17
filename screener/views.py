@@ -419,13 +419,6 @@ def recruiter_dashboard(request):
             cand.is_suspicious = True
             cand.suspicious_reasons.append("Missing primary candidate contact details (Email/Phone).")
 
-        # Heuristic 4: Suspicious/Disposable Email Domain
-        suspicious_domains = ["example.com", "test.com", "temp.com", "mailinator.com", "yopmail.com", "tempmail.com"]
-        email_domain = cand.email.split('@')[-1].lower() if '@' in cand.email else ""
-        if any(sd in email_domain for sd in suspicious_domains):
-            cand.is_suspicious = True
-            cand.suspicious_reasons.append(f"Suspicious email domain: @{email_domain} (disposable/test provider).")
-
         # Heuristic 5: Timeline Plausibility Anomaly (Inflated GenAI experience)
         resume_lower = cand.resume_text.lower()
         genai_buzzwords = ["chatgpt", "gpt-4", "prompt engineering", "langchain", "llama"]
