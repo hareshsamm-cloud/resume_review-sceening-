@@ -253,6 +253,90 @@ def recruiter_dashboard(request):
                 requirements_needed="||".join(gaps)
             )
             
+        # Create 3 custom mock candidates explicitly triggering different anomaly detection rules for live demo audits
+        fake_candidates = [
+            {
+                "name": "Lucas Vance",
+                "email": "lucas.vance@outlook.com",
+                "phone": "+1 (555) 901-1234",
+                "skills": "React,TypeScript,HTML,CSS,Node.js,Django,PostgreSQL,AWS,Docker,Kubernetes,PyTorch,Solidity,Unity,C#,Terraform,Git",
+                "experience_years": 3.2,
+                "resume_text": "Resume of Lucas Vance. Claims expert mastery in React, TypeScript, HTML, CSS, Node.js, Django, PostgreSQL, AWS, Docker, Kubernetes, PyTorch, Solidity, Unity, C#, Terraform, Git."
+            },
+            {
+                "name": "Sophia Chen",
+                "email": "sophia.chen@example.com",
+                "phone": "+1 (555) 302-5678",
+                "skills": "Python,PyTorch,ChatGPT,LangChain",
+                "experience_years": 6.5,
+                "resume_text": "Resume of Sophia Chen. Sophia has 6 years of experience in ChatGPT prompt engineering and LangChain pipeline developments."
+            },
+            {
+                "name": "Alex Rivera",
+                "email": "alex.rivera@yopmail.com",
+                "phone": "+1 (555) 403-7890",
+                "skills": "React,TailwindCSS,PyTorch,TensorFlow,Solidity,Web3,Unity",
+                "experience_years": 1.8,
+                "resume_text": "Resume of Alex Rivera. Professional front-end React developer, AI researcher in PyTorch and TensorFlow, Solidity smart contract designer, and Unity game developer."
+            }
+        ]
+        
+        for fc in fake_candidates:
+            skills_list = fc["skills"].split(",")
+            skills_lower = [s.lower() for s in skills_list]
+            matched_reqs = [r for r in req_skills if r in skills_lower]
+            skills_score = (len(matched_reqs) / len(req_skills)) * 100 if req_skills else 100
+            
+            candidate_exp = fc["experience_years"]
+            if candidate_exp >= min_exp:
+                exp_score = 100
+            else:
+                exp_score = (candidate_exp / min_exp) * 100 if min_exp > 0 else 100
+                
+            overall_score = round(0.7 * skills_score + 0.3 * exp_score)
+            
+            if overall_score >= 80:
+                fit = "Strong Match"
+            elif overall_score >= 60:
+                fit = "Good Match"
+            elif overall_score >= 40:
+                fit = "Partial Match"
+            else:
+                fit = "Poor Match"
+                
+            impressive = []
+            if len(matched_reqs) > 0:
+                skills_caps = [s.capitalize() for s in matched_reqs]
+                impressive.append(f"Matches required skills: {', '.join(skills_caps[:4])}")
+            if candidate_exp >= min_exp:
+                impressive.append(f"Exceeds experience requirement with {candidate_exp} years (required {min_exp} years)")
+            else:
+                impressive.append(f"Possesses {candidate_exp} years of relevant experience")
+            
+            extra_skills = [s for s in skills_list if s.lower() not in req_skills]
+            if extra_skills:
+                impressive.append(f"Brings auxiliary expertise in: {', '.join(extra_skills[:3])}")
+                
+            gaps = []
+            missing_reqs = [r.capitalize() for r in req_skills if r not in skills_lower]
+            if missing_reqs:
+                gaps.append(f"Lacks core technologies: {', '.join(missing_reqs[:4])}")
+            if candidate_exp < min_exp:
+                gaps.append(f"Experience deficit: {round(min_exp - candidate_exp, 1)} years short of requested {min_exp} years")
+                
+            Candidate.objects.create(
+                name=fc["name"],
+                email=fc["email"],
+                phone=fc["phone"],
+                skills=fc["skills"],
+                experience_years=candidate_exp,
+                resume_text=fc["resume_text"],
+                match_score=overall_score,
+                fit_assessment=fit,
+                impressive_summary="||".join(impressive),
+                requirements_needed="||".join(gaps)
+            )
+            
         return redirect('recruiter_dashboard')
 
     # Recalculate match details dynamically for all candidates in DB based on current filters
