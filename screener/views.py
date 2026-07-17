@@ -340,8 +340,8 @@ def recruiter_dashboard(request):
             
         return redirect('recruiter_dashboard')
 
-    # Recalculate match details dynamically for all candidates in DB based on current filters
-    all_candidates = Candidate.objects.all()
+    # Evaluate all candidates in-memory to preserve attached python properties in templates
+    all_candidates = list(Candidate.objects.all())
     req_skills = [s.strip().lower() for s in req_skills_str.split(',') if s.strip()]
     
     for cand in all_candidates:
@@ -392,24 +392,16 @@ def recruiter_dashboard(request):
         if candidate_exp < min_exp:
             gaps.append(f"Experience deficit: {round(min_exp - candidate_exp, 1)} years short of requested {min_exp} years")
             
-        # Update db fields
+        # Save calculations to DB
         cand.match_score = overall_score
         cand.fit_assessment = fit
         cand.impressive_summary = "||".join(impressive)
         cand.requirements_needed = "||".join(gaps)
         cand.save()
-    total_count = all_candidates.count()
-    
-    scanned_candidates = list(Candidate.objects.filter(decision="Pending").order_by('-match_score'))
-    top_candidates = scanned_candidates[:target_count]
-    other_candidates = scanned_candidates[target_count:]
-    
-    # Anomaly Detection Heuristics for Fraud Verification
-    for cand in list(top_candidates) + list(other_candidates) + list(accepted_candidates) + list(rejected_candidates):
+
+        # Run Anomaly / Authenticity Audits in-memory
         cand.is_suspicious = False
         cand.suspicious_reasons = []
-        
-        candidate_skills = [s.strip() for s in cand.skills.split(',') if s.strip()]
         
         # Heuristic 1: Keyword Stuffing (excessive tech stack keywords)
         if len(candidate_skills) > 9:
@@ -459,8 +451,22 @@ def recruiter_dashboard(request):
             cand.is_suspicious = True
             cand.suspicious_reasons.append(f"Multi-Stack Anomaly: Claims expert proficiency in {active_domains} unrelated domains (Web, AI, Blockchain, Game Dev).")
 
+    # In-memory partitioning to preserve properties
+    scanned_candidates = [c for c in all_candidates if c.decision == "Pending"]
+    scanned_candidates.sort(key=lambda c: c.match_score, reverse=True)
+    
+    top_candidates = scanned_candidates[:target_count]
+    other_candidates = scanned_candidates[target_count:]
+    
+    accepted_candidates = [c for c in all_candidates if c.decision == "Accepted"]
+    accepted_candidates.sort(key=lambda c: c.match_score, reverse=True)
+    
+    rejected_candidates = [c for c in all_candidates if c.decision == "Rejected"]
+    rejected_candidates.sort(key=lambda c: c.match_score, reverse=True)
+    
+    total_count = len(all_candidates)
     avg_score = round(sum(c.match_score for c in all_candidates) / total_count) if total_count > 0 else 0
-    strong_count = all_candidates.filter(match_score__gte=80).count()
+    strong_count = sum(1 for c in all_candidates if c.match_score >= 80)
 
     context = {
         'candidates': top_candidates,
