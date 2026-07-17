@@ -62,10 +62,12 @@ class StudentAccount(models.Model):
     username = models.CharField(max_length=150, unique=True)
     email = models.EmailField(unique=True)
     password = models.CharField(max_length=128)
+    fake_upload_count = models.IntegerField(default=0)
+    is_blacklisted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Student: {self.username}"
+        return f"Student: {self.username} (Fakes: {self.fake_upload_count}, Blacklisted: {self.is_blacklisted})"
 
 
 class CollegeAccount(models.Model):
@@ -76,3 +78,10 @@ class CollegeAccount(models.Model):
 
     def __str__(self):
         return f"College Admin: {self.username}"
+
+
+class PlacementConfig(models.Model):
+    max_fake_limit = models.IntegerField(default=3)
+
+    def __str__(self):
+        return f"Placement Configuration (Max Fakes: {self.max_fake_limit})"

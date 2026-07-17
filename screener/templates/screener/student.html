@@ -13,36 +13,59 @@
 
 {% block content %}
 <div style="max-width: 1000px; margin: 0 auto;">
-  <!-- Upload Zone -->
-  <div class="glass-card" style="margin-bottom: 30px;">
-    <h3 class="section-title" style="display: flex; align-items: center; gap: 8px;">
-      <i data-lucide="upload" style="color: var(--accent-blue); width: 22px; height: 22px;"></i>
-      Upload Your Resume
-    </h3>
-    <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 20px;">Upload your PDF or Text resume. Our system will analyze your strengths, highlight what stands out to recruiters, check your eligibility across top tech companies, and show you exactly what skills to learn to land interview offers at elite firms.</p>
-    
-    <form method="POST" enctype="multipart/form-data">
-      {% csrf_token %}
-      <div style="display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center;">
-        <div class="upload-dropzone" style="padding: 30px 10px;">
-          <div class="upload-icon" style="font-size: 32px; margin-bottom: 8px;">
-            <i data-lucide="file-text" style="width: 36px; height: 36px;"></i>
-          </div>
-          <p style="font-weight: 600; font-size: 13px;">Drop PDF or TXT Resume</p>
-          <input type="file" name="resume" accept=".pdf,.txt" onchange="updateFileName(this)">
-          <div id="file-name" style="margin-top: 8px; font-weight: 700; color: var(--accent-cyan); font-size: 12px; display: none;"></div>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 12px;">
-          <button type="submit" name="upload_resume" class="btn btn-primary" style="height: 50px; padding: 0 30px;">
-            <i data-lucide="compass" style="width: 16px; height: 16px;"></i> Analyze My Resume
-          </button>
-          <button type="submit" name="load_student_demo" class="btn btn-secondary" style="height: 50px;">
-            <i data-lucide="database" style="width: 16px; height: 16px;"></i> Demo Profile
-          </button>
-        </div>
+  {% if student.is_blacklisted %}
+    <!-- Blacklisted Suspended UI Block -->
+    <div class="glass-card" style="border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.04); padding: 40px; text-align: center; margin-bottom: 30px; border-radius: 16px; border-left: 4px solid var(--danger);">
+      <div style="display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 50%; background: rgba(239, 68, 68, 0.1); color: var(--danger); font-size: 32px; margin-bottom: 16px; border: 1px solid rgba(239, 68, 68, 0.25);">
+        <i data-lucide="shield-alert" style="width: 32px; height: 32px;"></i>
       </div>
-    </form>
-  </div>
+      <h3 style="color: var(--text-primary); font-size: 20px; font-weight: 800;">Campus Placement Account Suspended</h3>
+      <p style="color: var(--text-secondary); font-size: 14px; margin-top: 8px; max-width: 600px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+        Your account has been permanently **blacklisted** by the college placement administrator for repeatedly uploading falsified or suspicious resumes (anomalies detected: **{{ student.fake_upload_count }}** times; limit: **{{ max_fake_limit }}**). You are blocked from submitting any further applications to campus recruiting partners.
+      </p>
+    </div>
+  {% else %}
+    <!-- Warning Alerts for active warnings -->
+    {% if student.fake_upload_count > 0 %}
+      <div class="glass-card" style="border-left: 4px solid var(--warning); padding: 12px 20px; margin-bottom: 20px; background: rgba(245, 158, 11, 0.03); border-radius: 8px; display: flex; align-items: center; gap: 10px;">
+        <i data-lucide="alert-triangle" style="color: var(--warning); width: 20px; height: 20px;"></i>
+        <span style="font-size: 13.5px; color: var(--text-secondary);">
+          Placement Security Alert: You have received **{{ student.fake_upload_count }}** warning(s) for uploading resumes containing anomalies. Reaching **{{ max_fake_limit }}** fake uploads will permanently suspend your campus placement submissions.
+        </span>
+      </div>
+    {% endif %}
+
+    <!-- Upload Zone -->
+    <div class="glass-card" style="margin-bottom: 30px;">
+      <h3 class="section-title" style="display: flex; align-items: center; gap: 8px;">
+        <i data-lucide="upload" style="color: var(--accent-blue); width: 22px; height: 22px;"></i>
+        Upload Your Resume
+      </h3>
+      <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 20px;">Upload your PDF or Text resume. Our system will analyze your strengths, highlight what stands out to recruiters, check your eligibility across top tech companies, and show you exactly what skills to learn to land interview offers at elite firms.</p>
+      
+      <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div style="display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center;">
+          <div class="upload-dropzone" style="padding: 30px 10px;">
+            <div class="upload-icon" style="font-size: 32px; margin-bottom: 8px;">
+              <i data-lucide="file-text" style="width: 36px; height: 36px;"></i>
+            </div>
+            <p style="font-weight: 600; font-size: 13px;">Drop PDF or TXT Resume</p>
+            <input type="file" name="resume" accept=".pdf,.txt" onchange="updateFileName(this)">
+            <div id="file-name" style="margin-top: 8px; font-weight: 700; color: var(--accent-cyan); font-size: 12px; display: none;"></div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <button type="submit" name="upload_resume" class="btn btn-primary" style="height: 50px; padding: 0 30px;">
+              <i data-lucide="compass" style="width: 16px; height: 16px;"></i> Analyze My Resume
+            </button>
+            <button type="submit" name="load_student_demo" class="btn btn-secondary" style="height: 50px;">
+              <i data-lucide="database" style="width: 16px; height: 16px;"></i> Demo Profile
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  {% endif %}
 
   {% if candidate_profile %}
     <!-- Student Summary Highlight Card -->

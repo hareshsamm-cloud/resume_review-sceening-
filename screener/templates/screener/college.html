@@ -107,6 +107,84 @@
     </div>
   </div>
 
+  <!-- Placement Security & Safeguards (Blacklist settings & Unban) -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 30px; margin-bottom: 40px; align-items: start;">
+    <!-- Left panel: security config settings -->
+    <div class="glass-card" style="padding: 24px; border-left: 4px solid var(--accent-purple);">
+      <h4 style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+        <i data-lucide="shield-check" style="width: 18px; height: 18px; color: var(--accent-purple);"></i>
+        Placement Anti-Gaming Settings
+      </h4>
+      <p style="color: var(--text-secondary); font-size: 12.5px; margin-bottom: 20px; line-height: 1.4;">
+        Configure placement verification thresholds. If a student account repeatedly uploads resumes triggering fraud filters, the account is blacklisted automatically.
+      </p>
+
+      <form method="POST">
+        {% csrf_token %}
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Max Fake Upload Limit</label>
+          <input type="number" name="max_fake_limit" class="form-input" min="1" max="10" value="{{ config.max_fake_limit }}" style="width: 100%;">
+        </div>
+        <button type="submit" name="update_settings" class="btn btn-primary" style="width: 100%; height: 40px; font-size: 13px;">
+          <i data-lucide="save" style="width: 14px; height: 14px;"></i> Update Safety Limit
+        </button>
+      </form>
+    </div>
+
+    <!-- Right panel: blacklisted/warned list -->
+    <div class="glass-card" style="padding: 24px; border-left: 4px solid var(--danger);">
+      <h4 style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+        <i data-lucide="shield-alert" style="width: 18px; height: 18px; color: var(--danger);"></i>
+        Placement Security Alerts (Blacklist Audit)
+      </h4>
+
+      {% if not blacklisted_students and not warned_students %}
+        <div style="text-align: center; color: var(--text-tertiary); padding: 30px 10px;">
+          <i data-lucide="shield" style="width: 32px; height: 32px; margin-bottom: 8px; color: var(--text-tertiary);"></i>
+          <p style="font-size: 13px;">All placement student profiles currently have clean, verified resume upload logs.</p>
+        </div>
+      {% else %}
+        <div style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 4px;">
+          <!-- Blacklisted List -->
+          {% for student in blacklisted_students %}
+            <div style="background: rgba(239, 68, 68, 0.04); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 8px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+              <div>
+                <strong style="color: var(--text-primary); font-size: 13.5px;">{{ student.username }}</strong>
+                <span style="color: var(--text-secondary); font-size: 11.5px; display: block; margin-top: 2px;">{{ student.email }}</span>
+                <span class="badge badge-danger" style="margin-top: 6px; font-size: 9px; padding: 2px 6px;">Blacklisted (Fakes: {{ student.fake_upload_count }})</span>
+              </div>
+              <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="student_id" value="{{ student.id }}">
+                <button type="submit" name="unban_student" class="btn btn-success" style="padding: 6px 12px; font-size: 11px; height: 32px;">
+                  <i data-lucide="unlock" style="width: 12px; height: 12px;"></i> Restore Access
+                </button>
+              </form>
+            </div>
+          {% endfor %}
+
+          <!-- Warned List -->
+          {% for student in warned_students %}
+            <div style="background: rgba(245, 158, 11, 0.04); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 8px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+              <div>
+                <strong style="color: var(--text-primary); font-size: 13.5px;">{{ student.username }}</strong>
+                <span style="color: var(--text-secondary); font-size: 11.5px; display: block; margin-top: 2px;">{{ student.email }}</span>
+                <span class="badge" style="background: var(--warning-glow); color: var(--warning); margin-top: 6px; font-size: 9px; padding: 2px 6px; text-transform: uppercase;">Active Warnings: {{ student.fake_upload_count }} / {{ config.max_fake_limit }}</span>
+              </div>
+              <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="student_id" value="{{ student.id }}">
+                <button type="submit" name="unban_student" class="btn btn-secondary" style="padding: 6px 12px; font-size: 11px; height: 32px;">
+                  <i data-lucide="rotate-ccw" style="width: 12px; height: 12px;"></i> Reset Counter
+                </button>
+              </form>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
   <!-- Corporate Partners Search & Directory -->
   <div class="glass-card" style="padding: 24px;">
     <h3 class="section-title" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">

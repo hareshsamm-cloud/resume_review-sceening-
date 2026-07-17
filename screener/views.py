@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.contrib.auth.hashers import make_password, check_password
-from .models import Candidate, EmailLog, RecruiterAccount, StudentAccount, CollegeAccount
+from .models import Candidate, EmailLog, RecruiterAccount, StudentAccount, CollegeAccount, PlacementConfig
 from .parser import extract_text_from_pdf, parse_resume_full
 from .recommender import get_company_recommendations_by_role
 from .companies_data import COMPANIES_DATABASE
@@ -557,6 +557,12 @@ def student_dashboard(request):
         messages.error(request, "Please log in as a Student to access the Student Career Space.")
         return redirect('/login/?role=student')
 
+    username = request.session.get('username')
+    student = StudentAccount.objects.filter(username=username).first()
+
+    config = PlacementConfig.objects.first() or PlacementConfig.objects.create(max_fake_limit=3)
+    max_fake_limit = config.max_fake_limit
+
     candidate_profile = None
     eligible = []
     aspirational = []
@@ -567,6 +573,10 @@ def student_dashboard(request):
     session_profile = request.session.get('student_profile')
 
     if request.method == 'POST' and 'resume' in request.FILES:
+        if student and student.is_blacklisted:
+            messages.error(request, f"Your account has been BLACKLISTED. You cannot submit resumes.")
+            return redirect('student_dashboard')
+
         file = request.FILES['resume']
         text = ""
         
@@ -578,6 +588,111 @@ def student_dashboard(request):
         if text.strip():
             parsed = parse_resume_full(text)
             
+            # Student-side Authenticity Checks
+            is_suspicious = False
+            reasons = []
+            
+            cand_name = parsed["name"] if parsed["name"] != "Unknown Candidate" else os.path.splitext(file.name)[0].replace('_', ' ').replace('-', ' ').title()
+            cand_email = parsed["email"]
+            cand_phone = parsed["phone"]
+            candidate_skills = parsed["skills"]
+            candidate_skills_lower = [s.lower() for s in candidate_skills]
+            candidate_exp = parsed["experience_years"]
+            resume_lower = text.lower()
+            
+            if not cand_name.strip():
+                is_suspicious = True
+                reasons.append("Personal Info Anomaly: Candidate name field is empty.")
+            elif not re.match(r'^[a-zA-Z\s\.]+$', cand_name):
+                is_suspicious = True
+                reasons.append("Personal Info Anomaly: Candidate name contains invalid special characters.")
+
+            if cand_email != "No email found":
+                if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', cand_email):
+                    is_suspicious = True
+                    reasons.append(f"Personal Info Anomaly: Invalid email formatting syntax ('{cand_email}').")
+            else:
+                is_suspicious = True
+                reasons.append("Missing primary contact details (No email address found).")
+
+            if cand_phone != "No phone found":
+                if any(c.isalpha() for c in cand_phone):
+                    is_suspicious = True
+                    reasons.append("Personal Info Anomaly: Phone number contains invalid letters.")
+                phone_digits = "".join(c for c in cand_phone if c.isdigit())
+                if len(phone_digits) < 10 or len(phone_digits) > 15:
+                    is_suspicious = True
+                    reasons.append("Personal Info Anomaly: Phone digit length is invalid.")
+            else:
+                is_suspicious = True
+                reasons.append("Missing primary contact details (No phone number found).")
+
+            suspicious_domains = ["example.com", "test.com", "temp.com", "mailinator.com", "yopmail.com", "tempmail.com"]
+            email_domain = cand_email.split('@')[-1].lower() if '@' in cand_email else ""
+            if any(sd in email_domain for sd in suspicious_domains):
+                is_suspicious = True
+                reasons.append(f"Suspicious email domain: @{email_domain} (disposable provider).")
+
+            if len(candidate_skills) > 20:
+                is_suspicious = True
+                reasons.append(f"Keyword Stuffing Anomaly: Abnormally high skill density ({len(candidate_skills)} unique frameworks; limit is 20).")
+
+            if re.search(r'\b(\w+)\s+\1\s+\1\b', resume_lower):
+                is_suspicious = True
+                reasons.append("Keyword Stuffing Anomaly: Found 3+ consecutive repeating identical words.")
+
+            buzzwords = ["guru", "rockstar", "ninja", "legend", "visionary"]
+            matched_buzz = [b for b in buzzwords if re.search(rf"\b{b}\b", resume_lower)]
+            if matched_buzz:
+                is_suspicious = True
+                reasons.append(f"Buzzword Anomaly: Resume contains clickbait buzzwords ({', '.join(matched_buzz)}).")
+
+            tech_release_years = {
+                "React": 2013, "Docker": 2013, "Kubernetes": 2014, "TensorFlow": 2015,
+                "PyTorch": 2016, "Flutter": 2017, "LangChain": 2022, "ChatGPT": 2022
+            }
+            for tech, release_year in tech_release_years.items():
+                pattern = rf"{tech.lower()}[^.\n]*?\b(19\d{{2}}|200\d|201[0-2])\b"
+                if re.search(pattern, resume_lower):
+                    is_suspicious = True
+                    reasons.append(f"Certification Timeline Anomaly: Claims expertise in {tech} before release ({release_year}).")
+
+            if any(buzz in resume_lower for buzz in ["chatgpt", "gpt-4", "prompt engineering", "langchain", "llama"]) and candidate_exp > 4.0:
+                regex_genai = r'(?:4|5|6|7|8|9|\d{2,})\+?\s*(?:years?|yrs?)[^.\n]*(?:chatgpt|gpt-4|prompt engineering|langchain|llama|generative ai)'
+                if re.search(regex_genai, resume_lower):
+                    is_suspicious = True
+                    reasons.append("Certification Timeline Anomaly: Claims >4 years of experience in post-2022 Generative AI.")
+
+            web_skills = {"react", "typescript", "html", "css", "vue", "angular"}
+            ai_skills = {"pytorch", "tensorflow", "deep learning", "machine learning", "nlp"}
+            blockchain_skills = {"solidity", "ethereum", "smart contracts", "web3"}
+            game_skills = {"unity", "unreal engine", "c#"}
+            active_domains = 0
+            if any(s in candidate_skills_lower for s in web_skills): active_domains += 1
+            if any(s in candidate_skills_lower for s in ai_skills): active_domains += 1
+            if any(s in candidate_skills_lower for s in blockchain_skills): active_domains += 1
+            if any(s in candidate_skills_lower for s in game_skills): active_domains += 1
+            if active_domains >= 3:
+                is_suspicious = True
+                reasons.append(f"Multi-Stack Anomaly: Claims expert proficiency in {active_domains} unrelated domains.")
+
+            # Apply Anti-gaming Warnings & Block Blacklist
+            if is_suspicious:
+                if student:
+                    student.fake_upload_count += 1
+                    if student.fake_upload_count >= max_fake_limit:
+                        student.is_blacklisted = True
+                        student.save()
+                        messages.error(request, f"Your account has been BLACKLISTED. You have uploaded {student.fake_upload_count} fake resumes (limit: {max_fake_limit}).")
+                        return redirect('student_dashboard')
+                    else:
+                        student.save()
+                        messages.warning(request, f"Resume authenticity verification FAILED! Warning #{student.fake_upload_count} of {max_fake_limit} issued: {reasons[0]}")
+            else:
+                if student:
+                    messages.success(request, "Resume authenticity verified! No anomalies detected.")
+
+            # Load into parsed layout
             # Determine default role based on skills
             skills_lower = [s.lower() for s in parsed["skills"]]
             detected_role = "frontend"
@@ -594,15 +709,19 @@ def student_dashboard(request):
                 target_role = detected_role
                 
             session_profile = {
-                "name": parsed["name"] if parsed["name"] != "Unknown Candidate" else os.path.splitext(file.name)[0].replace('_', ' ').replace('-', ' ').title(),
-                "email": parsed["email"],
-                "phone": parsed["phone"],
-                "experience": parsed["experience_years"],
-                "skills": parsed["skills"]
+                "name": cand_name,
+                "email": cand_email,
+                "phone": cand_phone,
+                "experience": candidate_exp,
+                "skills": candidate_skills
             }
             request.session['student_profile'] = session_profile
             
     elif request.method == 'POST' and 'load_student_demo' in request.POST:
+        if student and student.is_blacklisted:
+            messages.error(request, "Your account has been BLACKLISTED. You cannot submit resumes.")
+            return redirect('student_dashboard')
+
         session_profile = {
             "name": "Sarah Jenkins",
             "email": "sarah.jenkins@stanford.edu",
@@ -654,7 +773,9 @@ def student_dashboard(request):
         'summary_highlight': summary_highlight,
         'job_roles': JOB_ROLES,
         'target_role': target_role,
-        'companies': COMPANIES_DATABASE
+        'companies': COMPANIES_DATABASE,
+        'student': student,
+        'max_fake_limit': max_fake_limit
     }
     return render(request, 'screener/student.html', context)
 
@@ -732,8 +853,39 @@ def college_dashboard(request):
         messages.error(request, "Please log in as a College Administrator to access the Placement Portal.")
         return redirect('/login/?role=college')
 
+    config = PlacementConfig.objects.first() or PlacementConfig.objects.create(max_fake_limit=3)
+
+    if request.method == 'POST' and 'update_settings' in request.POST:
+        max_fake_limit_str = request.POST.get('max_fake_limit', '3')
+        try:
+            limit = int(max_fake_limit_str)
+            if limit < 1:
+                limit = 1
+            config.max_fake_limit = limit
+            config.save()
+            messages.success(request, f"Placement security configuration updated. Blacklist threshold set to {limit} fakes.")
+        except ValueError:
+            messages.error(request, "Invalid threshold limit.")
+        return redirect('college_dashboard')
+
+    elif request.method == 'POST' and 'unban_student' in request.POST:
+        student_id = request.POST.get('student_id')
+        student_to_unban = StudentAccount.objects.filter(id=student_id).first()
+        if student_to_unban:
+            student_to_unban.fake_upload_count = 0
+            student_to_unban.is_blacklisted = False
+            student_to_unban.save()
+            messages.success(request, f"Account for Student {student_to_unban.username} restored successfully!")
+        return redirect('college_dashboard')
+
+    blacklisted_students = StudentAccount.objects.filter(is_blacklisted=True)
+    warned_students = StudentAccount.objects.filter(fake_upload_count__gt=0, is_blacklisted=False)
+
     context = {
         'companies': COMPANIES_DATABASE,
+        'config': config,
+        'blacklisted_students': blacklisted_students,
+        'warned_students': warned_students
     }
     return render(request, 'screener/college.html', context)
 
