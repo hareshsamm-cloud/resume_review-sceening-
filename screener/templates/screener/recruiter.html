@@ -432,6 +432,15 @@
         sectionDiv.style.display = 'block'; // show section
       }
     });
+
+    // Auto-select the first visible candidate in search results
+    const firstVisible = Array.from(rows).find(row => row.style.display !== 'none');
+    if (firstVisible) {
+      const idMatch = firstVisible.id.match(/cand-tab-(\d+)/);
+      if (idMatch) {
+        selectCandidate(idMatch[1]);
+      }
+    }
   }
 
   function selectCandidate(id) {
