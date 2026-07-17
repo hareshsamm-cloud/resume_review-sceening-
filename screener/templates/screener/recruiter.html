@@ -124,7 +124,7 @@
               </h3>
               <div class="candidates-list">
                 {% for candidate in candidates %}
-                  <div class="candidate-row {% if forloop.first and not accepted_candidates %}active{% endif %}" id="cand-tab-{{ candidate.id }}" onclick="selectCandidate({{ candidate.id }})">
+                  <div class="candidate-row {% if candidate.is_suspicious %}suspicious{% endif %} {% if forloop.first and not accepted_candidates %}active{% endif %}" id="cand-tab-{{ candidate.id }}" onclick="selectCandidate({{ candidate.id }})">
                     <div class="candidate-info">
                       <div class="candidate-avatar">
                         {{ candidate.name|slice:":1" }}
@@ -153,7 +153,7 @@
               </h3>
               <div class="candidates-list">
                 {% for candidate in other_candidates %}
-                  <div class="candidate-row" id="cand-tab-{{ candidate.id }}" onclick="selectCandidate({{ candidate.id }})">
+                  <div class="candidate-row {% if candidate.is_suspicious %}suspicious{% endif %}" id="cand-tab-{{ candidate.id }}" onclick="selectCandidate({{ candidate.id }})">
                     <div class="candidate-info">
                       <div class="candidate-avatar" style="color: var(--text-secondary);">
                         {{ candidate.name|slice:":1" }}
@@ -182,7 +182,7 @@
               </h3>
               <div class="candidates-list">
                 {% for candidate in accepted_candidates %}
-                  <div class="candidate-row" id="cand-tab-{{ candidate.id }}" onclick="selectCandidate({{ candidate.id }})" style="border-color: rgba(16, 185, 129, 0.2);">
+                  <div class="candidate-row {% if candidate.is_suspicious %}suspicious{% endif %}" id="cand-tab-{{ candidate.id }}" onclick="selectCandidate({{ candidate.id }})" style="border-color: rgba(16, 185, 129, 0.2);">
                     <div class="candidate-info">
                       <div class="candidate-avatar" style="background: var(--success-glow); color: var(--success);">
                         <i data-lucide="check" style="width: 16px; height: 16px;"></i>
@@ -207,7 +207,7 @@
               </h3>
               <div class="candidates-list">
                 {% for candidate in rejected_candidates %}
-                  <div class="candidate-row" id="cand-tab-{{ candidate.id }}" onclick="selectCandidate({{ candidate.id }})" style="border-color: rgba(239, 68, 68, 0.2);">
+                  <div class="candidate-row {% if candidate.is_suspicious %}suspicious{% endif %}" id="cand-tab-{{ candidate.id }}" onclick="selectCandidate({{ candidate.id }})" style="border-color: rgba(239, 68, 68, 0.2);">
                     <div class="candidate-info">
                       <div class="candidate-avatar" style="background: var(--danger-glow); color: var(--danger);">
                         <i data-lucide="x" style="width: 16px; height: 16px;"></i>

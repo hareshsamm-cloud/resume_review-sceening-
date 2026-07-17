@@ -384,6 +384,24 @@ body {
   border-color: var(--accent-blue);
   box-shadow: 0 0 15px rgba(59, 130, 246, 0.15);
 }
+.candidate-row.suspicious {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.05);
+}
+.candidate-row.suspicious .candidate-avatar {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+.candidate-row.suspicious:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.6);
+  transform: translateX(4px);
+}
+.candidate-row.suspicious.active {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.8);
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.25);
+}
 .candidate-info {
   display: flex;
   align-items: center;
