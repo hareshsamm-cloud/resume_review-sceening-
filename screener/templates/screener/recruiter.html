@@ -245,8 +245,66 @@
   </div>
 </div>
 
+<!-- Reported Profiles Section -->
+<div class="glass-card" style="margin-top: 40px; border-color: rgba(239, 68, 68, 0.2);">
+  <h3 class="section-title" style="color: var(--danger); display: flex; align-items: center; gap: 8px; margin-bottom: 20px;">
+    <i data-lucide="shield-alert" style="width: 22px; height: 22px; color: var(--danger);"></i>
+    Reported Fake Profiles & Integrity Log
+  </h3>
+  <p style="color: var(--text-secondary); font-size: 13.5px; margin-bottom: 20px;">The following student accounts or uploaded resumes triggered automated authenticity filters due to information contradictions, keyword stuffing, or invalid domains.</p>
+  
+  {% if not reported_profiles %}
+    <div style="text-align: center; color: var(--text-tertiary); padding: 30px; font-style: italic;">
+      No reported profiles. System integrity checks passed.
+    </div>
+  {% else %}
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
+      {% for profile in reported_profiles %}
+        <div class="glass-card" style="border-left: 4px solid var(--danger); background: rgba(239, 68, 68, 0.02); padding: 16px; border-radius: 8px;">
+          <div class="flex-between">
+            <h4 style="font-weight: 700; font-size: 15px; color: var(--text-primary);">{{ profile.name }}</h4>
+            <span style="font-size: 11px; color: var(--text-tertiary);">{{ profile.reported_at|date:"M d, Y" }}</span>
+          </div>
+          <p style="font-size: 12px; color: var(--accent-cyan); margin-top: 4px;">{{ profile.email }} • {{ profile.phone }}</p>
+          
+          <div style="margin-top: 10px;">
+            <strong style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Triggered Anomalies:</strong>
+            <ul style="margin-top: 4px; margin-left: 16px; list-style-type: disc; font-size: 11.5px; color: #fca5a5; display: flex; flex-direction: column; gap: 4px;">
+              {% for reason in profile.get_reasons_list %}
+                <li>{{ reason }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          
+          <div style="margin-top: 12px; border-top: 1px solid var(--glass-border); padding-top: 10px;">
+            <button type="button" class="btn btn-secondary" style="height: 30px; font-size: 11px; width: 100%; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="showReportedResume('{{ profile.id }}')">
+              <i data-lucide="eye" style="width: 12px; height: 12px;"></i> View Flagged Resume Text
+            </button>
+          </div>
+          
+          <div id="reported-resume-text-{{ profile.id }}" style="display: none; margin-top: 10px; background: rgba(0,0,0,0.25); padding: 8px; font-family: monospace; font-size: 11px; border-radius: 4px; color: var(--text-secondary); white-space: pre-wrap; max-height: 150px; overflow-y: auto; border: 1px solid var(--glass-border);">{{ profile.resume_text }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+
+<script>
+  function showReportedResume(profileId) {
+    const el = document.getElementById(`reported-resume-text-${profileId}`);
+    if (el) {
+      if (el.style.display === 'none') {
+        el.style.display = 'block';
+      } else {
+        el.style.display = 'none';
+      }
+    }
+  }
+</script>
+
 <!-- Outbox Email Simulator Terminal Log -->
 <div class="glass-card" style="margin-top: 40px;">
+
   <h3 class="outbox-title">
     <i data-lucide="terminal" style="color: var(--accent-cyan); width: 22px; height: 22px;"></i>
     Outgoing Mail server Outbox log (Simulation)

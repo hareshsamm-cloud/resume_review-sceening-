@@ -89,9 +89,23 @@
             <i data-lucide="phone" style="width: 13px; height: 13px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i> {{ candidate_profile.phone }}
           </p>
         </div>
-        <div class="badge badge-info" style="font-size: 12px; padding: 6px 12px;">
-          Estimated Experience: {{ candidate_profile.experience }} Years
+        <div style="text-align: right; display: flex; flex-direction: column; gap: 8px; align-items: flex-end;">
+          <div class="badge badge-info" style="font-size: 12px; padding: 6px 12px;">
+            Estimated Experience: {{ candidate_profile.experience }} Years
+          </div>
+          {% if rejections_after_upgrade > 0 %}
+            <div class="badge badge-danger" style="font-size: 11px; padding: 5px 10px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; display: flex; align-items: center; gap: 6px; border-radius: 6px;">
+              <i data-lucide="alert-triangle" style="width: 14px; height: 14px;"></i>
+              Rejections After Skillset Upgrade: {{ rejections_after_upgrade }}
+            </div>
+          {% else %}
+            <div class="badge badge-success" style="font-size: 11px; padding: 5px 10px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; display: flex; align-items: center; gap: 6px; border-radius: 6px;">
+              <i data-lucide="shield-check" style="width: 14px; height: 14px;"></i>
+              No rejections after skill upgrades
+            </div>
+          {% endif %}
         </div>
+
       </div>
       
       <div>

@@ -85,3 +85,22 @@ class PlacementConfig(models.Model):
 
     def __str__(self):
         return f"Placement Configuration (Max Fakes: {self.max_fake_limit})"
+
+
+class ReportedProfile(models.Model):
+    student = models.ForeignKey(StudentAccount, on_delete=models.CASCADE, related_name="reports", null=True, blank=True)
+    name = models.CharField(max_length=255)
+    email = models.EmailField()
+    phone = models.CharField(max_length=50)
+    reasons = models.TextField()  # double pipe "||" separated list of anomalies
+    resume_text = models.TextField()
+    reported_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Reported: {self.name} ({self.email})"
+
+    def get_reasons_list(self):
+        if not self.reasons:
+            return []
+        return [r.strip() for r in self.reasons.split("||") if r.strip()]
+

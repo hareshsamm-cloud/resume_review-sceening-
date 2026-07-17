@@ -6,10 +6,29 @@ from django.urls import reverse
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.contrib.auth.hashers import make_password, check_password
-from .models import Candidate, EmailLog, RecruiterAccount, StudentAccount, CollegeAccount, PlacementConfig
+from .models import Candidate, EmailLog, RecruiterAccount, StudentAccount, CollegeAccount, PlacementConfig, ReportedProfile
 from .parser import extract_text_from_pdf, parse_resume_full
 from .recommender import get_company_recommendations_by_role
 from .companies_data import COMPANIES_DATABASE
+
+def get_rejections_after_upgrade(email):
+    records = list(Candidate.objects.filter(email=email).order_by('id'))
+    rejections_after_upgrade = 0
+    prior_rejections = []
+    
+    for r in records:
+        if r.decision == 'Rejected':
+            r_skills = r.get_skills_list()
+            # Check if this rejection happened after a prior rejection where skills were fewer or different
+            for prev_r in prior_rejections:
+                prev_skills = prev_r.get_skills_list()
+                if len(r_skills) > len(prev_skills) or any(s not in prev_skills for s in r_skills):
+                    rejections_after_upgrade += 1
+                    break
+            prior_rejections.append(r)
+            
+    return rejections_after_upgrade
+
 
 from .roles_data import ROLES_DATABASE
 
@@ -73,8 +92,9 @@ def recruiter_dashboard(request):
         target_count = 3
 
     if request.method == 'POST' and 'resumes' in request.FILES:
-        # Delete previous candidates for a fresh scan
-        Candidate.objects.all().delete()
+        # Keep candidates submitted by registered students, delete only transient/recruiter files
+        student_emails = list(StudentAccount.objects.values_list('email', flat=True))
+        Candidate.objects.exclude(email__in=student_emails).delete()
         EmailLog.objects.all().delete()
         
         files = request.FILES.getlist('resumes')
@@ -159,8 +179,10 @@ def recruiter_dashboard(request):
         return redirect('recruiter_dashboard')
 
     elif request.method == 'POST' and 'unload_demo' in request.POST:
-        Candidate.objects.all().delete()
+        student_emails = list(StudentAccount.objects.values_list('email', flat=True))
+        Candidate.objects.exclude(email__in=student_emails).delete()
         EmailLog.objects.all().delete()
+        ReportedProfile.objects.exclude(email__in=student_emails).delete()
         return redirect('recruiter_dashboard')
 
     elif request.method == 'POST' and 'load_demo' in request.POST:
@@ -415,9 +437,9 @@ def recruiter_dashboard(request):
         cand.suspicious_reasons = []
         
         # 1. Personal Information Validation Rules (Rules 1, 3, 4, 5, 6)
-        if cand.name.strip() == "":
+        if cand.name.strip() == "" or cand.name == "Unknown Candidate":
             cand.is_suspicious = True
-            cand.suspicious_reasons.append("Personal Info Anomaly: Candidate name field is empty.")
+            cand.suspicious_reasons.append("Personal Info Anomaly: Candidate name field is empty or unknown.")
         elif not re.match(r'^[a-zA-Z\s\.]+$', cand.name):
             cand.is_suspicious = True
             cand.suspicious_reasons.append("Personal Info Anomaly: Candidate name contains invalid special characters.")
@@ -438,12 +460,15 @@ def recruiter_dashboard(request):
             if len(phone_digits) < 10 or len(phone_digits) > 15:
                 cand.is_suspicious = True
                 cand.suspicious_reasons.append(f"Personal Info Anomaly: Phone digit length is invalid (must be 10-15 digits, parsed {len(phone_digits)}).")
+            if re.search(r'(\d)\1{7,}', phone_digits) or "12345678" in phone_digits or "98765432" in phone_digits:
+                cand.is_suspicious = True
+                cand.suspicious_reasons.append("Personal Info Anomaly: Phone number contains suspicious repeating or sequential digits.")
         else:
             cand.is_suspicious = True
             cand.suspicious_reasons.append("Missing primary contact details (No phone number found).")
 
         # Heuristic 4: Suspicious/Disposable Email Domain
-        suspicious_domains = ["example.com", "test.com", "temp.com", "mailinator.com", "yopmail.com", "tempmail.com"]
+        suspicious_domains = ["example.com", "test.com", "temp.com", "mailinator.com", "yopmail.com", "tempmail.com", "10minutemail.com", "sharklasers.com", "guerrillamail.com"]
         email_domain = cand.email.split('@')[-1].lower() if '@' in cand.email else ""
         if any(sd in email_domain for sd in suspicious_domains):
             cand.is_suspicious = True
@@ -479,18 +504,17 @@ def recruiter_dashboard(request):
             "ChatGPT": 2022
         }
         for tech, release_year in tech_release_years.items():
-            # Check for patterns like "React certification in 2008"
             pattern = rf"{tech.lower()}[^.\n]*?\b(19\d{{2}}|200\d|201[0-2])\b"
             if re.search(pattern, resume_lower):
                 cand.is_suspicious = True
                 cand.suspicious_reasons.append(f"Certification Timeline Anomaly: Claims certification or expertise in {tech} before its release year ({release_year}).")
 
-        # Heuristic: Timeline Plausibility Anomaly (ChatGPT/GenAI years check)
-        if any(buzz in resume_lower for buzz in ["chatgpt", "gpt-4", "prompt engineering", "langchain", "llama"]) and cand.experience_years > 4.0:
-            regex_genai = r'(?:4|5|6|7|8|9|\d{2,})\+?\s*(?:years?|yrs?)[^.\n]*(?:chatgpt|gpt-4|prompt engineering|langchain|llama|generative ai)'
+        # Heuristic: Timeline Plausibility Anomaly (ChatGPT/GenAI check, lowered to > 3.0 years)
+        if any(buzz in resume_lower for buzz in ["chatgpt", "gpt-4", "prompt engineering", "langchain", "llama"]) and cand.experience_years > 3.0:
+            regex_genai = r'(?:3|4|5|6|7|8|9|\d{2,})\+?\s*(?:years?|yrs?)[^.\n]*(?:chatgpt|gpt-4|prompt engineering|langchain|llama|generative ai)'
             if re.search(regex_genai, resume_lower):
                 cand.is_suspicious = True
-                cand.suspicious_reasons.append("Certification Timeline Anomaly: Claims >4 years of experience in post-2022 Generative AI/LLMs.")
+                cand.suspicious_reasons.append("Certification Timeline Anomaly: Claims >3 years of experience in post-2022 Generative AI/LLMs.")
 
         # Heuristic: Cross-Domain Tech Conflict (Rule 36)
         web_skills = {"react", "typescript", "html", "css", "vue", "angular"}
@@ -514,6 +538,19 @@ def recruiter_dashboard(request):
             cand.is_suspicious = True
             cand.suspicious_reasons.append(f"Seniority Mismatch Anomaly: Targeting a senior/architect role with only {cand.experience_years} years of experience.")
 
+        # Create ReportedProfile if this candidate is suspicious and not already reported
+        if cand.is_suspicious:
+            if not ReportedProfile.objects.filter(email=cand.email).exists():
+                student_acc = StudentAccount.objects.filter(email=cand.email).first()
+                ReportedProfile.objects.create(
+                    student=student_acc,
+                    name=cand.name,
+                    email=cand.email,
+                    phone=cand.phone,
+                    reasons="||".join(cand.suspicious_reasons),
+                    resume_text=cand.resume_text
+                )
+
     # In-memory partitioning to preserve properties
     scanned_candidates = [c for c in all_candidates if c.decision == "Pending"]
     scanned_candidates.sort(key=lambda c: c.match_score, reverse=True)
@@ -531,6 +568,7 @@ def recruiter_dashboard(request):
     avg_score = round(sum(c.match_score for c in all_candidates) / total_count) if total_count > 0 else 0
     strong_count = sum(1 for c in all_candidates if c.match_score >= 80)
 
+    reported_profiles = ReportedProfile.objects.all().order_by('-reported_at')
     context = {
         'candidates': top_candidates,
         'other_candidates': other_candidates,
@@ -545,7 +583,8 @@ def recruiter_dashboard(request):
         'target_count': target_count_str,
         'job_roles': JOB_ROLES,
         'selected_role': selected_role_key,
-        'all_candidates': all_candidates
+        'all_candidates': all_candidates,
+        'reported_profiles': reported_profiles
     }
     return render(request, 'screener/recruiter.html', context)
 
@@ -569,8 +608,9 @@ def student_dashboard(request):
     summary_highlight = ""
     target_role = request.POST.get('target_role', '') if request.method == 'POST' else request.GET.get('target_role', '')
     
-    # Store temporary session profile info to allow dynamic target role toggling
-    session_profile = request.session.get('student_profile')
+    rejections_after_upgrade = 0
+    if student:
+        rejections_after_upgrade = get_rejections_after_upgrade(student.email)
 
     if request.method == 'POST' and 'resume' in request.FILES:
         if student and student.is_blacklisted:
@@ -600,9 +640,9 @@ def student_dashboard(request):
             candidate_exp = parsed["experience_years"]
             resume_lower = text.lower()
             
-            if not cand_name.strip():
+            if not cand_name.strip() or cand_name == "Unknown Candidate":
                 is_suspicious = True
-                reasons.append("Personal Info Anomaly: Candidate name field is empty.")
+                reasons.append("Personal Info Anomaly: Candidate name field is empty or unknown.")
             elif not re.match(r'^[a-zA-Z\s\.]+$', cand_name):
                 is_suspicious = True
                 reasons.append("Personal Info Anomaly: Candidate name contains invalid special characters.")
@@ -623,11 +663,14 @@ def student_dashboard(request):
                 if len(phone_digits) < 10 or len(phone_digits) > 15:
                     is_suspicious = True
                     reasons.append("Personal Info Anomaly: Phone digit length is invalid.")
+                if re.search(r'(\d)\1{7,}', phone_digits) or "12345678" in phone_digits or "98765432" in phone_digits:
+                    is_suspicious = True
+                    reasons.append("Personal Info Anomaly: Phone number contains suspicious repeating or sequential digits.")
             else:
                 is_suspicious = True
                 reasons.append("Missing primary contact details (No phone number found).")
 
-            suspicious_domains = ["example.com", "test.com", "temp.com", "mailinator.com", "yopmail.com", "tempmail.com"]
+            suspicious_domains = ["example.com", "test.com", "temp.com", "mailinator.com", "yopmail.com", "tempmail.com", "10minutemail.com", "sharklasers.com", "guerrillamail.com"]
             email_domain = cand_email.split('@')[-1].lower() if '@' in cand_email else ""
             if any(sd in email_domain for sd in suspicious_domains):
                 is_suspicious = True
@@ -657,11 +700,11 @@ def student_dashboard(request):
                     is_suspicious = True
                     reasons.append(f"Certification Timeline Anomaly: Claims expertise in {tech} before release ({release_year}).")
 
-            if any(buzz in resume_lower for buzz in ["chatgpt", "gpt-4", "prompt engineering", "langchain", "llama"]) and candidate_exp > 4.0:
-                regex_genai = r'(?:4|5|6|7|8|9|\d{2,})\+?\s*(?:years?|yrs?)[^.\n]*(?:chatgpt|gpt-4|prompt engineering|langchain|llama|generative ai)'
+            if any(buzz in resume_lower for buzz in ["chatgpt", "gpt-4", "prompt engineering", "langchain", "llama"]) and candidate_exp > 3.0:
+                regex_genai = r'(?:3|4|5|6|7|8|9|\d{2,})\+?\s*(?:years?|yrs?)[^.\n]*(?:chatgpt|gpt-4|prompt engineering|langchain|llama|generative ai)'
                 if re.search(regex_genai, resume_lower):
                     is_suspicious = True
-                    reasons.append("Certification Timeline Anomaly: Claims >4 years of experience in post-2022 Generative AI.")
+                    reasons.append("Certification Timeline Anomaly: Claims >3 years of experience in post-2022 Generative AI.")
 
             web_skills = {"react", "typescript", "html", "css", "vue", "angular"}
             ai_skills = {"pytorch", "tensorflow", "deep learning", "machine learning", "nlp"}
@@ -684,30 +727,105 @@ def student_dashboard(request):
                         student.is_blacklisted = True
                         student.save()
                         messages.error(request, f"Your account has been BLACKLISTED. You have uploaded {student.fake_upload_count} fake resumes (limit: {max_fake_limit}).")
-                        return redirect('student_dashboard')
                     else:
                         student.save()
-                        messages.warning(request, f"Resume authenticity verification FAILED! Warning #{student.fake_upload_count} of {max_fake_limit} issued: {reasons[0]}")
+                        messages.warning(request, f"Resume authenticity verification FAILED! Warning #{student.fake_upload_count} of {max_fake_limit} issued: {', '.join(reasons)}")
+                    
+                    # Create ReportedProfile record
+                    ReportedProfile.objects.create(
+                        student=student,
+                        name=cand_name,
+                        email=cand_email,
+                        phone=cand_phone,
+                        reasons="||".join(reasons),
+                        resume_text=text
+                    )
+                return redirect('student_dashboard')
             else:
                 if student:
                     messages.success(request, "Resume authenticity verified! No anomalies detected.")
 
-            # Load into parsed layout
-            # Determine default role based on skills
-            skills_lower = [s.lower() for s in parsed["skills"]]
-            detected_role = "frontend"
-            if any(s in skills_lower for s in ["django", "flask", "node.js", "java", "ruby", "go"]):
-                detected_role = "backend"
-            elif any(s in skills_lower for s in ["machine learning", "tensorflow", "deep learning", "pandas"]):
-                detected_role = "data_science"
-            elif any(s in skills_lower for s in ["docker", "kubernetes", "aws", "terraform"]):
-                detected_role = "devops"
-            elif any(s in skills_lower for s in ["react native", "flutter", "ios", "android", "swift"]):
-                detected_role = "mobile"
+                # Determine default role based on skills
+                skills_lower = [s.lower() for s in parsed["skills"]]
+                detected_role = "frontend"
+                if any(s in skills_lower for s in ["django", "flask", "node.js", "java", "ruby", "go"]):
+                    detected_role = "backend"
+                elif any(s in skills_lower for s in ["machine learning", "tensorflow", "deep learning", "pandas"]):
+                    detected_role = "data_science"
+                elif any(s in skills_lower for s in ["docker", "kubernetes", "aws", "terraform"]):
+                    detected_role = "devops"
+                elif any(s in skills_lower for s in ["react native", "flutter", "ios", "android", "swift"]):
+                    detected_role = "mobile"
+                    
+                selected_role_key = target_role or detected_role
+                role_info = ROLES_DATABASE.get(selected_role_key, {})
+                req_skills = [s.strip().lower() for s in role_info.get("skills", [])]
+                min_exp = float(role_info.get("experience", 1.0))
                 
-            if not target_role:
-                target_role = detected_role
+                # Match score calculation
+                matched_reqs = [r for r in req_skills if r in candidate_skills_lower]
+                skills_score = (len(matched_reqs) / len(req_skills)) * 100 if req_skills else 100
                 
+                if candidate_exp >= min_exp:
+                    exp_score = 100
+                else:
+                    exp_score = (candidate_exp / min_exp) * 100 if min_exp > 0 else 100
+                    
+                overall_score = round(0.7 * skills_score + 0.3 * exp_score)
+                
+                if overall_score >= 80:
+                    fit = "Strong Match"
+                elif overall_score >= 60:
+                    fit = "Good Match"
+                elif overall_score >= 40:
+                    fit = "Partial Match"
+                else:
+                    fit = "Poor Match"
+                    
+                impressive = []
+                if len(matched_reqs) > 0:
+                    skills_caps = [s.capitalize() for s in matched_reqs]
+                    impressive.append(f"Matches required skills: {', '.join(skills_caps[:4])}")
+                if candidate_exp >= min_exp:
+                    impressive.append(f"Exceeds experience requirement with {candidate_exp} years")
+                else:
+                    impressive.append(f"Possesses {candidate_exp} years of relevant experience")
+                    
+                gaps = []
+                missing_reqs = [r.capitalize() for r in req_skills if r not in candidate_skills_lower]
+                if missing_reqs:
+                    gaps.append(f"Lacks core technologies: {', '.join(missing_reqs[:4])}")
+                if candidate_exp < min_exp:
+                    gaps.append(f"Experience deficit: {round(min_exp - candidate_exp, 1)} years short")
+
+                # Create or update candidate record in the recruiter database
+                existing_pending = Candidate.objects.filter(email=cand_email, decision="Pending").first()
+                if existing_pending:
+                    existing_pending.name = cand_name
+                    existing_pending.phone = cand_phone
+                    existing_pending.skills = ",".join(candidate_skills)
+                    existing_pending.experience_years = candidate_exp
+                    existing_pending.resume_text = text
+                    existing_pending.match_score = overall_score
+                    existing_pending.fit_assessment = fit
+                    existing_pending.impressive_summary = "||".join(impressive)
+                    existing_pending.requirements_needed = "||".join(gaps)
+                    existing_pending.save()
+                else:
+                    Candidate.objects.create(
+                        name=cand_name,
+                        email=cand_email,
+                        phone=cand_phone,
+                        skills=",".join(candidate_skills),
+                        experience_years=candidate_exp,
+                        resume_text=text,
+                        match_score=overall_score,
+                        fit_assessment=fit,
+                        impressive_summary="||".join(impressive),
+                        requirements_needed="||".join(gaps),
+                        decision="Pending"
+                    )
+
             session_profile = {
                 "name": cand_name,
                 "email": cand_email,
@@ -738,14 +856,12 @@ def student_dashboard(request):
         if not target_role:
             target_role = "frontend"
             
-        # evaluate company matching for the selected target role
         eligible, aspirational = get_company_recommendations_by_role(
             candidate_profile["skills"], 
             candidate_profile["experience"], 
             target_role
         )
         
-        # Generate automated professional bio highlight
         primary_skill = candidate_profile["skills"][0] if candidate_profile["skills"] else "Software"
         exp_text = f"{candidate_profile['experience']} years" if candidate_profile['experience'] > 1 else "1 year"
         skills_badges_str = ", ".join(candidate_profile["skills"][:5])
@@ -775,7 +891,8 @@ def student_dashboard(request):
         'target_role': target_role,
         'companies': COMPANIES_DATABASE,
         'student': student,
-        'max_fake_limit': max_fake_limit
+        'max_fake_limit': max_fake_limit,
+        'rejections_after_upgrade': rejections_after_upgrade
     }
     return render(request, 'screener/student.html', context)
 
@@ -880,12 +997,14 @@ def college_dashboard(request):
 
     blacklisted_students = StudentAccount.objects.filter(is_blacklisted=True)
     warned_students = StudentAccount.objects.filter(fake_upload_count__gt=0, is_blacklisted=False)
+    reported_profiles = ReportedProfile.objects.all().order_by('-reported_at')
 
     context = {
         'companies': COMPANIES_DATABASE,
         'config': config,
         'blacklisted_students': blacklisted_students,
-        'warned_students': warned_students
+        'warned_students': warned_students,
+        'reported_profiles': reported_profiles
     }
     return render(request, 'screener/college.html', context)
 
