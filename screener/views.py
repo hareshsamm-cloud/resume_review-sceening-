@@ -342,6 +342,38 @@ def recruiter_dashboard(request):
             cand.is_suspicious = True
             cand.suspicious_reasons.append("Missing primary candidate contact details (Email/Phone).")
 
+        # Heuristic 4: Suspicious/Disposable Email Domain
+        suspicious_domains = ["example.com", "test.com", "temp.com", "mailinator.com", "yopmail.com", "tempmail.com"]
+        email_domain = cand.email.split('@')[-1].lower() if '@' in cand.email else ""
+        if any(sd in email_domain for sd in suspicious_domains):
+            cand.is_suspicious = True
+            cand.suspicious_reasons.append(f"Suspicious email domain: @{email_domain} (disposable/test provider).")
+
+        # Heuristic 5: Timeline Plausibility Anomaly (Inflated GenAI experience)
+        resume_lower = cand.resume_text.lower()
+        genai_buzzwords = ["chatgpt", "gpt-4", "prompt engineering", "langchain", "llama"]
+        if any(buzz in resume_lower for buzz in genai_buzzwords) and cand.experience_years > 4.0:
+            regex_genai = r'(?:4|5|6|7|8|9|\d{2,})\+?\s*(?:years?|yrs?)[^.\n]*(?:chatgpt|gpt-4|prompt engineering|langchain|llama|generative ai)'
+            if re.search(regex_genai, resume_lower):
+                cand.is_suspicious = True
+                cand.suspicious_reasons.append("Timeline Anomaly: Claims >4 years of experience in post-2022 Generative AI/LLMs.")
+
+        # Heuristic 6: Cross-Domain Tech Conflict (Conflicting profiles)
+        web_skills = {"react", "typescript", "html", "css", "vue", "angular"}
+        ai_skills = {"pytorch", "tensorflow", "deep learning", "machine learning", "nlp"}
+        blockchain_skills = {"solidity", "ethereum", "smart contracts", "web3"}
+        game_skills = {"unity", "unreal engine", "c#"}
+        
+        active_domains = 0
+        if any(s in candidate_skills_lower for s in web_skills): active_domains += 1
+        if any(s in candidate_skills_lower for s in ai_skills): active_domains += 1
+        if any(s in candidate_skills_lower for s in blockchain_skills): active_domains += 1
+        if any(s in candidate_skills_lower for s in game_skills): active_domains += 1
+        
+        if active_domains >= 3:
+            cand.is_suspicious = True
+            cand.suspicious_reasons.append(f"Multi-Stack Anomaly: Claims expert proficiency in {active_domains} unrelated domains (Web, AI, Blockchain, Game Dev).")
+
     avg_score = round(sum(c.match_score for c in all_candidates) / total_count) if total_count > 0 else 0
     strong_count = all_candidates.filter(match_score__gte=80).count()
 
