@@ -66,7 +66,7 @@ def recruiter_dashboard(request):
     except ValueError:
         target_count = 3
 
-    if request.method == 'POST' and 'upload_resumes' in request.FILES:
+    if request.method == 'POST' and 'resumes' in request.FILES:
         # Delete previous candidates for a fresh scan
         Candidate.objects.all().delete()
         EmailLog.objects.all().delete()
