@@ -1,0 +1,55 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}ResumeSphere AI{% endblock %}</title>
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="{% static 'screener/style.css' %}">
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="container nav-header">
+    <a href="{% url 'landing' %}" class="logo-area">
+      <div class="logo-icon">R</div>
+      <div>
+        <div class="logo-text">ResumeSphere <span style="background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">AI</span></div>
+        <div class="logo-tagline">Hackathon Engine</div>
+      </div>
+    </a>
+    <div class="nav-buttons">
+      <a href="{% url 'landing' %}" class="btn btn-secondary">
+        <i data-lucide="home" style="width: 16px; height: 16px;"></i> Home
+      </a>
+      {% block nav_actions %}{% endblock %}
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container">
+    {% if messages %}
+      {% for message in messages %}
+        <div class="glass-card flex-between" style="border-left: 4px solid var(--success); padding: 12px 20px; margin-bottom: 20px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <i data-lucide="check-circle" style="color: var(--success); width: 20px; height: 20px;"></i>
+            <span style="font-size: 14px; font-weight: 500;">{{ message }}</span>
+          </div>
+          <i data-lucide="x" style="cursor: pointer; width: 16px; height: 16px;" onclick="this.parentElement.remove()"></i>
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    {% block content %}
+    {% endblock %}
+  </main>
+
+  <script>
+    // Initialize Lucide Icons
+    lucide.createIcons();
+  </script>
+</body>
+</html>

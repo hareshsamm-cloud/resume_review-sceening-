@@ -1,0 +1,36 @@
+{% extends 'screener/base.html' %}
+
+{% block title %}ResumeSphere AI - Landing Gate{% endblock %}
+
+{% block content %}
+<div class="landing-hero">
+  <h1>Intelligent Resume Screening & Recommendations</h1>
+  <p>An offline AI-powered recruitment engine built for recruiters to screen resumes in bulk, and students to unlock career path recommendations.</p>
+</div>
+
+<div class="portal-grid">
+  <!-- Recruiter Entry -->
+  <a href="{% url 'recruiter_dashboard' %}" class="glass-card portal-card">
+    <div class="portal-icon">
+      <i data-lucide="briefcase" style="width: 32px; height: 32px;"></i>
+    </div>
+    <h2>Recruiter Cockpit</h2>
+    <p>Upload resumes in bulk, configure target technical skills, filter experience requirements, limit candidate selections, and send personalized feedback emails via our Outbox Simulator.</p>
+    <span class="btn btn-primary" style="margin-top: 10px; width: 100%;">
+      Enter Recruiter Space <i data-lucide="arrow-right" style="width: 16px; height: 16px;"></i>
+    </span>
+  </a>
+
+  <!-- Student Entry -->
+  <a href="{% url 'student_dashboard' %}" class="glass-card portal-card">
+    <div class="portal-icon">
+      <i data-lucide="graduation-cap" style="width: 32px; height: 32px;"></i>
+    </div>
+    <h2>Student Career Space</h2>
+    <p>Upload your resume, see a structured summary of what is impressive in your background, get matched eligibility scores for leading companies, and review learning roadmaps for aspirational targets.</p>
+    <span class="btn btn-primary" style="margin-top: 10px; width: 100%;">
+      Enter Student Space <i data-lucide="arrow-right" style="width: 16px; height: 16px;"></i>
+    </span>
+  </a>
+</div>
+{% endblock %}

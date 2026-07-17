@@ -1,0 +1,218 @@
+{% extends 'screener/base.html' %}
+
+{% block title %}ResumeSphere AI - Student Career space{% endblock %}
+
+{% block nav_actions %}
+<a href="{% url 'recruiter_dashboard' %}" class="btn btn-primary">
+  <i data-lucide="briefcase" style="width: 16px; height: 16px;"></i> Recruiter Space
+</a>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 1000px; margin: 0 auto;">
+  <!-- Upload Zone -->
+  <div class="glass-card" style="margin-bottom: 30px;">
+    <h3 class="section-title" style="display: flex; align-items: center; gap: 8px;">
+      <i data-lucide="upload" style="color: var(--accent-blue); width: 22px; height: 22px;"></i>
+      Upload Your Resume
+    </h3>
+    <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 20px;">Upload your PDF or Text resume. Our system will analyze your strengths, highlight what stands out to recruiters, check your eligibility across top tech companies, and show you exactly what skills to learn to land interview offers at elite firms.</p>
+    
+    <form method="POST" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div style="display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center;">
+        <div class="upload-dropzone" style="padding: 30px 10px;">
+          <div class="upload-icon" style="font-size: 32px; margin-bottom: 8px;">
+            <i data-lucide="file-text" style="width: 36px; height: 36px;"></i>
+          </div>
+          <p style="font-weight: 600; font-size: 13px;">Drop PDF or TXT Resume</p>
+          <input type="file" name="resume" accept=".pdf,.txt" onchange="updateFileName(this)">
+          <div id="file-name" style="margin-top: 8px; font-weight: 700; color: var(--accent-cyan); font-size: 12px; display: none;"></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <button type="submit" name="upload_resume" class="btn btn-primary" style="height: 50px; padding: 0 30px;">
+            <i data-lucide="compass" style="width: 16px; height: 16px;"></i> Analyze My Resume
+          </button>
+          <button type="submit" name="load_student_demo" class="btn btn-secondary" style="height: 50px;">
+            <i data-lucide="database" style="width: 16px; height: 16px;"></i> Demo Profile
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  {% if candidate_profile %}
+    <!-- Student Summary Highlight Card -->
+    <div class="highlight-box">
+      <div class="highlight-title" style="display: flex; align-items: center; gap: 8px;">
+        <i data-lucide="sparkles" style="width: 20px; height: 20px;"></i>
+        Career Profile Summary Highlight
+      </div>
+      <p class="highlight-text">{{ summary_highlight|safe }}</p>
+    </div>
+
+    <!-- Student Parsed Profile Card -->
+    <div class="glass-card" style="margin-bottom: 40px;">
+      <div class="detail-header" style="border-bottom: 1px solid var(--glass-border); padding-bottom: 16px; margin-bottom: 16px;">
+        <div>
+          <h2 style="font-size: 24px; font-weight: 700;">{{ candidate_profile.name }}</h2>
+          <p style="color: var(--accent-cyan); font-size: 13px; font-weight: 600; margin-top: 4px;">
+            <i data-lucide="mail" style="width: 13px; height: 13px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i> {{ candidate_profile.email }}
+          </p>
+          <p style="color: var(--text-secondary); font-size: 13px; margin-top: 2px;">
+            <i data-lucide="phone" style="width: 13px; height: 13px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i> {{ candidate_profile.phone }}
+          </p>
+        </div>
+        <div class="badge badge-info" style="font-size: 12px; padding: 6px 12px;">
+          Estimated Experience: {{ candidate_profile.experience }} Years
+        </div>
+      </div>
+      
+      <div>
+        <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1px; margin-bottom: 8px;">Your Skill Tags</h4>
+        <div class="skills-grid">
+          {% for skill in candidate_profile.skills %}
+            <span class="skill-badge" style="background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.25); color: var(--accent-cyan);">{{ skill }}</span>
+          {% empty %}
+            <span style="color: var(--text-tertiary); font-size: 12px; font-style: italic;">No skills extracted</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Target Role Selection Dropdown -->
+    <div class="glass-card" style="margin-bottom: 30px;">
+      <form method="POST" id="role-selector-form">
+        {% csrf_token %}
+        <div class="form-group" style="margin-bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;">
+          <div>
+            <h4 style="font-weight: 700; font-size: 16px;">Target Career Role</h4>
+            <p style="color: var(--text-secondary); font-size: 13px;">Select a target role to dynamically update your company eligibility checklists and up-skilling guides.</p>
+          </div>
+          <select id="target_role" name="target_role" class="form-input" style="width: 250px;" onchange="document.getElementById('role-selector-form').submit()">
+            {% for key, val in job_roles.items %}
+              <option value="{{ key }}" {% if target_role == key %}selected{% endif %}>{{ val.title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </form>
+    </div>
+
+    <!-- Recommendations Group -->
+    <div style="margin-top: 40px;">
+      
+      <!-- Eligible matches -->
+      <h3 class="section-title" style="color: var(--success); display: flex; align-items: center; gap: 8px; margin-bottom: 20px;">
+        <i data-lucide="check-circle" style="width: 22px; height: 22px;"></i>
+        Direct Career Eligibility Matches (Score >= 75%)
+      </h3>
+      
+      {% if not eligible %}
+        <div class="glass-card" style="text-align: center; color: var(--text-secondary); padding: 30px 10px;">
+          <i data-lucide="x-circle" style="width: 32px; height: 32px; margin-bottom: 8px; color: var(--text-tertiary);"></i>
+          <p>You do not currently meet the direct matching threshold for our default top-tier list. Check out Aspirational matches below to see how to align!</p>
+        </div>
+      {% else %}
+        <div class="company-card-grid">
+          {% for comp in eligible %}
+            <div class="glass-card company-card" style="border-color: rgba(16, 185, 129, 0.25); background: linear-gradient(180deg, rgba(16, 185, 129, 0.03) 0%, rgba(17, 21, 44, 0.65) 100%);">
+              <div>
+                <div class="company-info">
+                  <img src="{{ comp.logo_url }}" class="company-logo" alt="{{ comp.name }}">
+                  <div class="company-meta">
+                    <h4>{{ comp.name }}</h4>
+                    <span class="badge" style="background: var(--success-glow); color: var(--success);">{{ comp.difficulty }} Match</span>
+                  </div>
+                </div>
+                <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">{{ comp.description }}</p>
+                <div style="font-size: 12px; margin-bottom: 8px;">
+                  <strong style="color: var(--text-secondary);">Requirements Met:</strong>
+                  <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;">
+                    {% for ms in comp.matched_skills %}
+                      <span class="skill-badge" style="padding: 2px 6px; font-size: 10px; border-color: rgba(16, 185, 129, 0.2); background: rgba(16, 185, 129, 0.05); color: var(--success);">{{ ms }}</span>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+              <div class="flex-between" style="border-top: 1px solid var(--glass-border); padding-top: 10px; margin-top: 12px;">
+                <span class="match-label">Eligibility Match</span>
+                <span style="font-size: 18px; font-weight: 800; color: var(--success);">{{ comp.match_score }}%</span>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <!-- Aspirational target matches -->
+      <h3 class="section-title" style="color: var(--warning); display: flex; align-items: center; gap: 8px; margin-top: 40px; margin-bottom: 20px;">
+        <i data-lucide="trending-up" style="width: 22px; height: 22px;"></i>
+        Aspirational Corporate Targets & Up-skilling Roadmaps (Score < 75%)
+      </h3>
+      
+      {% if not aspirational %}
+        <div class="glass-card" style="text-align: center; color: var(--text-secondary); padding: 30px 10px;">
+          <p>Congratulations! You have scored high enough to qualify for all tech companies in our index.</p>
+        </div>
+      {% else %}
+        <div class="company-card-grid">
+          {% for comp in aspirational %}
+            <div class="glass-card company-card" style="border-color: rgba(245, 158, 11, 0.25); background: linear-gradient(180deg, rgba(245, 158, 11, 0.03) 0%, rgba(17, 21, 44, 0.65) 100%);">
+              <div>
+                <div class="company-info">
+                  <img src="{{ comp.logo_url }}" class="company-logo" alt="{{ comp.name }}">
+                  <div class="company-meta">
+                    <h4>{{ comp.name }}</h4>
+                    <span class="badge" style="background: var(--warning-glow); color: var(--warning);">{{ comp.difficulty }} Target</span>
+                  </div>
+                </div>
+                <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-bottom: 12px;">{{ comp.description }}</p>
+                
+                {% if comp.missing_skills %}
+                  <div style="font-size: 12px; margin-bottom: 8px;">
+                    <strong style="color: var(--text-secondary);">Gaps to Learn:</strong>
+                    <div class="skills-gap-list">
+                      {% for ms in comp.missing_skills %}
+                        <span class="gap-badge"><i data-lucide="plus-circle" style="width: 9px; height: 9px; display: inline-block; vertical-align: middle; margin-right: 2px;"></i>{{ ms }}</span>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endif %}
+
+                {% if comp.exp_gap > 0 %}
+                  <p style="font-size: 11px; color: var(--danger); font-weight: 500; display: flex; align-items: center; gap: 4px;">
+                    <i data-lucide="clock" style="width: 12px; height: 12px;"></i> Experience short of target: Need {{ comp.exp_gap }} more year(s)
+                  </p>
+                {% endif %}
+              </div>
+              <div class="flex-between" style="border-top: 1px solid var(--glass-border); padding-top: 10px; margin-top: 12px;">
+                <span class="match-label">Eligibility Match</span>
+                <span style="font-size: 18px; font-weight: 800; color: var(--warning);">{{ comp.match_score }}%</span>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+    </div>
+  {% else %}
+    <!-- Empty Slate -->
+    <div class="glass-card welcome-info" style="padding: 100px 0;">
+      <i data-lucide="compass" style="width: 64px; height: 64px; color: var(--bg-tertiary);"></i>
+      <h2>Unlock Career Recommendations</h2>
+      <p style="margin-top: 8px; font-size: 14px;">Upload your PDF/TXT resume or load the "Demo Profile" to receive dynamic feedback, company compatibility scores, and personalized career roadmaps.</p>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+  function updateFileName(input) {
+    const fileNameDiv = document.getElementById('file-name');
+    if (input.files.length > 0) {
+      fileNameDiv.innerText = `Selected: ${input.files[0].name}`;
+      fileNameDiv.style.display = 'block';
+    } else {
+      fileNameDiv.style.display = 'none';
+    }
+  }
+</script>
+{% endblock %}

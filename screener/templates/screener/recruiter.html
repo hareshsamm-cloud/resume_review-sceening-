@@ -1,0 +1,453 @@
+{% extends 'screener/base.html' %}
+
+{% block title %}ResumeSphere AI - Recruiter Dashboard{% endblock %}
+
+{% block nav_actions %}
+<a href="{% url 'student_dashboard' %}" class="btn btn-primary">
+  <i data-lucide="graduation-cap" style="width: 16px; height: 16px;"></i> Student Space
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="stats-row">
+  <div class="glass-card stat-card">
+    <div class="stat-val">{{ total_count }}</div>
+    <div class="stat-lbl">Resumes Scanned</div>
+  </div>
+  <div class="glass-card stat-card">
+    <div class="stat-val">{{ avg_score }}%</div>
+    <div class="stat-lbl">Average Match</div>
+  </div>
+  <div class="glass-card stat-card">
+    <div class="stat-val">{{ strong_count }}</div>
+    <div class="stat-lbl">Strong Candidates</div>
+  </div>
+</div>
+
+<div class="dashboard-grid">
+  <!-- Left Side: Parameter Forms & Upload -->
+  <div style="display: flex; flex-direction: column; gap: 24px;">
+    
+    <!-- Custom Parameter Panel -->
+    <div class="glass-card">
+      <h3 class="section-title" style="display: flex; align-items: center; gap: 8px;">
+        <i data-lucide="sliders" style="color: var(--accent-blue); width: 20px; height: 20px;"></i>
+        Screening Criteria
+      </h3>
+      
+      <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        
+        <div class="form-group">
+          <label for="job_role">Target Job Role Template</label>
+          <select id="job_role" name="job_role" class="form-input" onchange="applyRoleTemplate(this.value)">
+            <option value="custom" {% if selected_role == 'custom' %}selected{% endif %}>-- Custom Parameters --</option>
+            {% for key, val in job_roles.items %}
+              <option value="{{ key }}" {% if selected_role == key %}selected{% endif %}>{{ val.title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="skills_required">Target Technical Skills (Comma-separated)</label>
+          <input type="text" id="skills_required" name="skills_required" value="{{ skills_required }}" class="form-input" placeholder="e.g. React, Python, Django">
+        </div>
+        
+        <div class="form-group">
+          <label for="min_experience">Minimum Experience Years</label>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <input type="range" id="min_experience" name="min_experience" min="0" max="10" step="0.5" value="{{ min_experience }}" class="form-input" style="flex: 1; padding: 0;" oninput="this.nextElementSibling.innerText = this.value + ' yrs'">
+            <span style="font-weight: 700; width: 60px; text-align: right; color: var(--accent-cyan);">{{ min_experience }} yrs</span>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="target_count">Number of Candidates Required (Cap)</label>
+          <input type="number" id="target_count" name="target_count" value="{{ target_count }}" min="1" max="50" class="form-input">
+        </div>
+
+        <div class="upload-dropzone" style="margin-bottom: 20px;">
+          <div class="upload-icon">
+            <i data-lucide="cloud-upload" style="width: 48px; height: 48px;"></i>
+          </div>
+          <p style="font-weight: 600; font-size: 14px;">Drag & Drop Resumes (PDF / TXT)</p>
+          <p style="color: var(--text-secondary); font-size: 11px; margin-top: 4px;">Supports bulk multi-upload (up to 50 files)</p>
+          <input type="file" name="resumes" multiple accept=".pdf,.txt" onchange="updateFileLabel(this)">
+          <div id="file-count" style="margin-top: 8px; font-weight: 700; color: var(--accent-cyan); font-size: 12px; display: none;"></div>
+        </div>
+        
+        <div style="display: flex; gap: 12px;">
+          <button type="submit" name="upload_resumes" class="btn btn-primary" style="flex: 1;">
+            <i data-lucide="cpu" style="width: 16px; height: 16px;"></i> Scan Resumes
+          </button>
+          
+          <button type="submit" name="load_demo" class="btn btn-secondary">
+            <i data-lucide="database" style="width: 16px; height: 16px;"></i> Load Mock
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Right Side: Leaderboard & Details split -->
+  <div style="display: flex; flex-direction: column; gap: 24px;">
+    {% if not candidates and not accepted_candidates and not rejected_candidates %}
+      <!-- Empty Slate -->
+      <div class="glass-card welcome-info">
+        <div class="icon">
+          <i data-lucide="files" style="width: 64px; height: 64px;"></i>
+        </div>
+        <h2>No candidates parsed yet</h2>
+        <p style="margin-top: 8px; font-size: 14px;">Upload multiple candidate resumes or click the "Load Mock" button to see the ranking logic in action!</p>
+      </div>
+    {% else %}
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start;">
+        <!-- Candidates Ranking Leaderboard -->
+        <div style="display: flex; flex-direction: column; gap: 20px; position: relative;">
+          
+          <!-- Search Candidate Bar -->
+          <div style="position: relative; margin-bottom: 5px;">
+            <input type="text" id="cand-search-input" class="form-input" placeholder="🔍 Search candidate by name..." oninput="handleSearch(this.value)">
+          </div>
+          
+          {% if candidates %}
+            <div>
+              <h3 class="section-title" style="color: var(--accent-cyan); font-size: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="crown" style="width: 18px; height: 18px;"></i>
+                Top Requested Candidates (Top {{ target_count }})
+              </h3>
+              <div class="candidates-list">
+                {% for candidate in candidates %}
+                  <div class="candidate-row {% if forloop.first and not accepted_candidates %}active{% endif %}" id="cand-tab-{{ candidate.id }}" onclick="selectCandidate({{ candidate.id }})">
+                    <div class="candidate-info">
+                      <div class="candidate-avatar">
+                        {{ candidate.name|slice:":1" }}
+                      </div>
+                      <div class="candidate-meta">
+                        <h3>{{ candidate.name }}</h3>
+                        <p>{{ candidate.experience_years }} yrs exp • {{ candidate.get_skills_list|length }} skills</p>
+                      </div>
+                    </div>
+                    <div class="candidate-score-badge">
+                      <span class="score-badge {% if candidate.match_score >= 80 %}score-strong{% elif candidate.match_score >= 60 %}score-good{% else %}score-poor{% endif %}">
+                        {{ candidate.match_score }}%
+                      </span>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+
+          {% if other_candidates %}
+            <div>
+              <h3 class="section-title" style="color: var(--text-secondary); font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="layers" style="width: 16px; height: 16px;"></i>
+                Alternative Talent Reservoir
+              </h3>
+              <div class="candidates-list">
+                {% for candidate in other_candidates %}
+                  <div class="candidate-row" id="cand-tab-{{ candidate.id }}" onclick="selectCandidate({{ candidate.id }})">
+                    <div class="candidate-info">
+                      <div class="candidate-avatar" style="color: var(--text-secondary);">
+                        {{ candidate.name|slice:":1" }}
+                      </div>
+                      <div class="candidate-meta">
+                        <h3>{{ candidate.name }}</h3>
+                        <p>{{ candidate.experience_years }} yrs exp • {{ candidate.get_skills_list|length }} skills</p>
+                      </div>
+                    </div>
+                    <div class="candidate-score-badge">
+                      <span class="score-badge {% if candidate.match_score >= 80 %}score-strong{% elif candidate.match_score >= 60 %}score-good{% else %}score-poor{% endif %}" style="opacity: 0.7;">
+                        {{ candidate.match_score }}%
+                      </span>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+
+          {% if accepted_candidates %}
+            <div>
+              <h3 class="section-title" style="color: var(--success); font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="check-circle" style="width: 16px; height: 16px;"></i>
+                Hired / Accepted Candidates
+              </h3>
+              <div class="candidates-list">
+                {% for candidate in accepted_candidates %}
+                  <div class="candidate-row" id="cand-tab-{{ candidate.id }}" onclick="selectCandidate({{ candidate.id }})" style="border-color: rgba(16, 185, 129, 0.2);">
+                    <div class="candidate-info">
+                      <div class="candidate-avatar" style="background: var(--success-glow); color: var(--success);">
+                        <i data-lucide="check" style="width: 16px; height: 16px;"></i>
+                      </div>
+                      <div class="candidate-meta">
+                        <h3>{{ candidate.name }}</h3>
+                        <p style="color: var(--success);">Accepted offer email sent</p>
+                      </div>
+                    </div>
+                    <span class="score-badge score-strong">{{ candidate.match_score }}%</span>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+
+          {% if rejected_candidates %}
+            <div>
+              <h3 class="section-title" style="color: var(--danger); font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="x-circle" style="width: 16px; height: 16px;"></i>
+                Rejected Candidates (Feedback Sent)
+              </h3>
+              <div class="candidates-list">
+                {% for candidate in rejected_candidates %}
+                  <div class="candidate-row" id="cand-tab-{{ candidate.id }}" onclick="selectCandidate({{ candidate.id }})" style="border-color: rgba(239, 68, 68, 0.2);">
+                    <div class="candidate-info">
+                      <div class="candidate-avatar" style="background: var(--danger-glow); color: var(--danger);">
+                        <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+                      </div>
+                      <div class="candidate-meta">
+                        <h3>{{ candidate.name }}</h3>
+                        <p style="color: var(--text-tertiary);">Rejection feedback email sent</p>
+                      </div>
+                    </div>
+                    <span class="score-badge score-poor">{{ candidate.match_score }}%</span>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+
+        </div>
+
+        <!-- Candidate Detail Viewer Panel -->
+        <div class="glass-card" id="detail-display-panel" style="position: sticky; top: 20px;">
+          <!-- Loaded dynamically via JS -->
+          <div class="welcome-info" style="padding: 100px 0;">
+            <i data-lucide="contact" style="width: 48px; height: 48px; color: var(--bg-tertiary);"></i>
+            <p style="margin-top: 10px;">Select a candidate to review detailed match breakdown</p>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Outbox Email Simulator Terminal Log -->
+<div class="glass-card" style="margin-top: 40px;">
+  <h3 class="outbox-title">
+    <i data-lucide="terminal" style="color: var(--accent-cyan); width: 22px; height: 22px;"></i>
+    Outgoing Mail server Outbox log (Simulation)
+  </h3>
+  <div class="outbox-terminal">
+    <div style="color: var(--text-tertiary); margin-bottom: 8px;">[System Initialization] SMTP connection mocked. Log capturing started...</div>
+    {% if not email_logs %}
+      <div style="color: #64748b; font-style: italic;">[No emails sent yet. Click 'Accept' or 'Reject' on a candidate above to trigger logs]</div>
+    {% else %}
+      {% for log in email_logs %}
+        <div class="outbox-log-entry">
+          <span class="outbox-timestamp">[{{ log.sent_at|date:"H:i:s" }}]</span>
+          <span style="color: var(--accent-blue);">POST /send_mail</span>
+          <span>Decision: </span><span class="outbox-status {{ log.status }}">{{ log.status }}</span>
+          <span>To: <strong style="color: var(--text-primary);">{{ log.recipient_email }}</strong></span>
+          <div style="color: var(--text-secondary); margin-left: 20px; margin-top: 4px; white-space: pre-wrap; font-size: 12px; background: rgba(255,255,255,0.02); padding: 8px; border-left: 2px solid var(--accent-blue);"><strong>Subject: {{ log.subject }}</strong><br>{{ log.body }}</div>
+        </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+</div>
+
+<!-- Hidden candidate details stores. Renders once into hidden HTML divs to allow instant client-side detail tab toggling -->
+{% for candidate in all_candidates %}
+  <div id="cand-detail-data-{{ candidate.id }}" style="display: none;">
+    <div class="detail-header">
+      <div>
+        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 4px;">{{ candidate.name }}</h2>
+        <p style="color: var(--accent-cyan); font-size: 13px; font-weight: 600;">
+          <i data-lucide="mail" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i> {{ candidate.email }}
+        </p>
+        <p style="color: var(--text-secondary); font-size: 12px; margin-top: 2px;">
+          <i data-lucide="phone" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i> {{ candidate.phone }}
+        </p>
+      </div>
+      
+      <div class="radial-score-container">
+        <div class="circle-chart">
+          <svg viewBox="0 0 36 36" width="70" height="70">
+            <path class="circle-chart__background" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            <path class="circle-chart__circle" stroke-dasharray="{{ candidate.match_score }}, 100" style="stroke: {% if candidate.match_score >= 80 %}var(--success){% elif candidate.match_score >= 60 %}var(--warning){% else %}var(--danger){% endif %};" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+          </svg>
+          <div class="circle-chart__percent">{{ candidate.match_score }}%</div>
+        </div>
+      </div>
+    </div>
+    
+    <div>
+      <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1px;">Extracted Skills</h4>
+      <div class="skills-grid">
+        {% for skill in candidate.get_skills_list %}
+          <span class="skill-badge">{{ skill }}</span>
+        {% empty %}
+          <span style="color: var(--text-tertiary); font-size: 12px; font-style: italic;">No standard tech skills extracted</span>
+        {% endfor %}
+      </div>
+      <p style="color: var(--text-secondary); font-size: 13px; margin-top: 6px;">Experience Level: <strong style="color: var(--text-primary);">{{ candidate.experience_years }} Years</strong></p>
+    </div>
+
+    <!-- What is Impressive & Requirements Needed Split -->
+    <div class="card-split">
+      <div class="split-card split-card-success">
+        <h4>
+          <i data-lucide="award" style="width: 16px; height: 16px;"></i> What is Impressive
+        </h4>
+        <ul class="bullet-list">
+          {% for item in candidate.get_impressive_list %}
+            <li>{{ item }}</li>
+          {% empty %}
+            <li>Standout highlights not generated</li>
+          {% endfor %}
+        </ul>
+      </div>
+      
+      <div class="split-card split-card-warning">
+        <h4>
+          <i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Gaps / Needs
+        </h4>
+        <ul class="bullet-list">
+          {% for item in candidate.get_gaps_list %}
+            <li>{{ item }}</li>
+          {% empty %}
+            <li style="color: var(--success);">Profile fully matches all criteria!</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <!-- Action Bar accept/reject forms -->
+    <div style="display: flex; gap: 16px; margin-top: 30px; border-top: 1px solid var(--glass-border); padding-top: 20px;">
+      {% if candidate.decision == "Pending" %}
+        <form action="{% url 'send_decision_email' candidate.id 'Accepted' %}" method="POST" style="flex: 1;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-success" style="width: 100%;">
+            <i data-lucide="check" style="width: 16px; height: 16px;"></i> Accept (Send Offer)
+          </button>
+        </form>
+        <form action="{% url 'send_decision_email' candidate.id 'Rejected' %}" method="POST" style="flex: 1;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger" style="width: 100%;">
+            <i data-lucide="x" style="width: 16px; height: 16px;"></i> Reject (Send Feedback)
+          </button>
+        </form>
+      {% else %}
+        <div style="text-align: center; width: 100%; font-weight: 600; padding: 8px 12px; border-radius: 8px; background: {% if candidate.decision == 'Accepted' %}var(--success-glow){% else %}var(--danger-glow){% endif %}; color: {% if candidate.decision == 'Accepted' %}var(--success){% else %}var(--danger){% endif %}; border: 1px solid {% if candidate.decision == 'Accepted' %}rgba(16,185,129,0.3){% else %}rgba(239,68,68,0.3){% endif %};">
+          Decision logged: {{ candidate.decision }} Email Sent
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endfor %}
+
+<script>
+  function updateFileLabel(input) {
+    const fileCountDiv = document.getElementById('file-count');
+    if (input.files.length > 0) {
+      fileCountDiv.innerText = `${input.files.length} file(s) selected`;
+      fileCountDiv.style.display = 'block';
+    } else {
+      fileCountDiv.style.display = 'none';
+    }
+  }
+
+  const roleTemplates = {
+    {% for key, val in job_roles.items %}
+      "{{ key }}": {
+        "skills": "{{ val.skills }}",
+        "experience": "{{ val.experience }}"
+      },
+    {% endfor %}
+  };
+
+  function applyRoleTemplate(roleKey) {
+    if (roleKey === 'custom' || !roleTemplates[roleKey]) return;
+    
+    const template = roleTemplates[roleKey];
+    document.getElementById('skills_required').value = template.skills;
+    
+    const expInput = document.getElementById('min_experience');
+    expInput.value = template.experience;
+    expInput.nextElementSibling.innerText = template.experience + ' yrs';
+  }
+
+  function handleSearch(query) {
+    const term = query.toLowerCase().trim();
+    
+    // Select all candidate rows
+    const rows = document.querySelectorAll('.candidate-row');
+    
+    rows.forEach(row => {
+      const nameHeader = row.querySelector('.candidate-meta h3');
+      if (!nameHeader) return;
+      
+      const name = nameHeader.textContent.toLowerCase();
+      if (name.includes(term)) {
+        row.style.display = 'flex'; // show matching row
+      } else {
+        row.style.display = 'none'; // hide non-matching row
+      }
+    });
+    
+    // Hide lists headers/sections if all of their children are hidden
+    document.querySelectorAll('.candidates-list').forEach(list => {
+      const children = Array.from(list.querySelectorAll('.candidate-row'));
+      const visibleChildren = children.filter(child => child.style.display !== 'none');
+      const sectionDiv = list.parentElement;
+      
+      if (visibleChildren.length === 0 && term !== '') {
+        sectionDiv.style.display = 'none'; // hide entire category section if no matches
+      } else {
+        sectionDiv.style.display = 'block'; // show section
+      }
+    });
+  }
+
+  function selectCandidate(id) {
+    // Highlight selected card
+    document.querySelectorAll('.candidate-row').forEach(row => {
+      row.classList.remove('active');
+    });
+    const selectedTab = document.getElementById('cand-tab-' + id);
+    if (selectedTab) {
+      selectedTab.classList.add('active');
+    }
+    
+    // Copy the HTML data into the display container
+    const detailData = document.getElementById('cand-detail-data-' + id);
+    const displayPanel = document.getElementById('detail-display-panel');
+    if (detailData && displayPanel) {
+      displayPanel.innerHTML = detailData.innerHTML;
+      lucide.createIcons(); // re-initialize SVGs inside display
+    }
+  }
+
+  // Pre-load the first candidate detail on window load
+  window.addEventListener('DOMContentLoaded', () => {
+    // Find active tab
+    const activeTab = document.querySelector('.candidate-row.active');
+    if (activeTab) {
+      const match = activeTab.id.match(/cand-tab-(\d+)/);
+      if (match) {
+        selectCandidate(match[1]);
+      }
+    } else {
+      // fallback to first candidate if no active exists
+      const firstTab = document.querySelector('.candidate-row');
+      if (firstTab) {
+        const match = firstTab.id.match(/cand-tab-(\d+)/);
+        if (match) {
+          selectCandidate(match[1]);
+        }
+      }
+    }
+  });
+</script>
+{% endblock %}
