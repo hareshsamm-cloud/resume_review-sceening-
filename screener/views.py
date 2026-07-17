@@ -5,7 +5,8 @@ from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.contrib import messages
 from django.core.mail import send_mail
-from .models import Candidate, EmailLog
+from django.contrib.auth.hashers import make_password, check_password
+from .models import Candidate, EmailLog, RecruiterAccount, StudentAccount, CollegeAccount
 from .parser import extract_text_from_pdf, parse_resume_full
 from .recommender import get_company_recommendations_by_role
 from .companies_data import COMPANIES_DATABASE
@@ -32,6 +33,10 @@ def recruiter_dashboard(request):
     """
     Recruiter workspace dashboard.
     """
+    if request.session.get('user_role') != 'recruiter':
+        messages.error(request, "Please log in as a Recruiter to access the Recruiter Cockpit.")
+        return redirect('/login/?role=recruiter')
+
     candidates = Candidate.objects.filter(decision="Pending").order_by('-match_score')
     accepted_candidates = Candidate.objects.filter(decision="Accepted").order_by('-match_score')
     rejected_candidates = Candidate.objects.filter(decision="Rejected").order_by('-match_score')
@@ -548,6 +553,10 @@ def student_dashboard(request):
     """
     Student workspace dashboard.
     """
+    if request.session.get('user_role') != 'student':
+        messages.error(request, "Please log in as a Student to access the Student Career Space.")
+        return redirect('/login/?role=student')
+
     candidate_profile = None
     eligible = []
     aspirational = []
@@ -719,7 +728,104 @@ def college_dashboard(request):
     """
     College Placement & Partner Management Dashboard.
     """
+    if request.session.get('user_role') != 'college':
+        messages.error(request, "Please log in as a College Administrator to access the Placement Portal.")
+        return redirect('/login/?role=college')
+
     context = {
         'companies': COMPANIES_DATABASE,
     }
     return render(request, 'screener/college.html', context)
+
+
+def signup_view(request):
+    role = request.GET.get('role', 'recruiter')
+    if request.method == 'POST':
+        role = request.POST.get('role', 'recruiter')
+        username = request.POST.get('username', '').strip()
+        email = request.POST.get('email', '').strip()
+        password = request.POST.get('password', '').strip()
+        
+        if not username or not email or not password:
+            messages.error(request, "All fields are required.")
+            return render(request, 'screener/signup.html', {'role': role})
+            
+        if not email.endswith('@gmail.com'):
+            messages.error(request, "Only Gmail addresses (@gmail.com) are allowed.")
+            return render(request, 'screener/signup.html', {'role': role})
+            
+        hashed_pw = make_password(password)
+        
+        try:
+            if role == 'recruiter':
+                if RecruiterAccount.objects.filter(username=username).exists() or RecruiterAccount.objects.filter(email=email).exists():
+                    messages.error(request, "Username or Email already exists in Recruiter database.")
+                    return render(request, 'screener/signup.html', {'role': role})
+                RecruiterAccount.objects.create(username=username, email=email, password=hashed_pw)
+            elif role == 'student':
+                if StudentAccount.objects.filter(username=username).exists() or StudentAccount.objects.filter(email=email).exists():
+                    messages.error(request, "Username or Email already exists in Student database.")
+                    return render(request, 'screener/signup.html', {'role': role})
+                StudentAccount.objects.create(username=username, email=email, password=hashed_pw)
+            elif role == 'college':
+                if CollegeAccount.objects.filter(username=username).exists() or CollegeAccount.objects.filter(email=email).exists():
+                    messages.error(request, "Username or Email already exists in College database.")
+                    return render(request, 'screener/signup.html', {'role': role})
+                CollegeAccount.objects.create(username=username, email=email, password=hashed_pw)
+            else:
+                messages.error(request, "Invalid workspace role selected.")
+                return render(request, 'screener/signup.html', {'role': role})
+                
+            messages.success(request, f"Account created successfully for {username}! Please log in.")
+            return redirect(f"/login/?role={role}")
+            
+        except Exception as e:
+            messages.error(request, f"Error creating account: {e}")
+            return render(request, 'screener/signup.html', {'role': role})
+            
+    return render(request, 'screener/signup.html', {'role': role})
+
+
+def login_view(request):
+    role = request.GET.get('role', 'recruiter')
+    if request.method == 'POST':
+        role = request.POST.get('role', 'recruiter')
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '').strip()
+        
+        if not username or not password:
+            messages.error(request, "Please enter both username and password.")
+            return render(request, 'screener/login.html', {'role': role})
+            
+        user = None
+        if role == 'recruiter':
+            user = RecruiterAccount.objects.filter(username=username).first()
+        elif role == 'student':
+            user = StudentAccount.objects.filter(username=username).first()
+        elif role == 'college':
+            user = CollegeAccount.objects.filter(username=username).first()
+            
+        if user and check_password(password, user.password):
+            request.session['user_id'] = user.id
+            request.session['user_role'] = role
+            request.session['username'] = user.username
+            messages.success(request, f"Welcome back, {user.username}!")
+            
+            if role == 'recruiter':
+                return redirect('recruiter_dashboard')
+            elif role == 'student':
+                return redirect('student_dashboard')
+            elif role == 'college':
+                return redirect('college_dashboard')
+        else:
+            messages.error(request, f"Invalid username or password in {role.capitalize()} workspace database.")
+            return render(request, 'screener/login.html', {'role': role})
+            
+    return render(request, 'screener/login.html', {'role': role})
+
+
+def logout_view(request):
+    role = request.session.get('user_role', 'recruiter')
+    request.session.flush()
+    messages.success(request, "Logged out successfully.")
+    return redirect(f"/login/?role={role}")

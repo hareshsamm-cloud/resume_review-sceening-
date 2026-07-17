@@ -45,3 +45,34 @@ class EmailLog(models.Model):
 
     def __str__(self):
         return f"{self.status} email to {self.recipient_email} at {self.sent_at}"
+
+
+# Separate accounts databases for each workspace dashboard
+class RecruiterAccount(models.Model):
+    username = models.CharField(max_length=150, unique=True)
+    email = models.EmailField(unique=True)
+    password = models.CharField(max_length=128)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Recruiter: {self.username}"
+
+
+class StudentAccount(models.Model):
+    username = models.CharField(max_length=150, unique=True)
+    email = models.EmailField(unique=True)
+    password = models.CharField(max_length=128)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Student: {self.username}"
+
+
+class CollegeAccount(models.Model):
+    username = models.CharField(max_length=150, unique=True)
+    email = models.EmailField(unique=True)
+    password = models.CharField(max_length=128)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"College Admin: {self.username}"

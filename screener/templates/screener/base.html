@@ -21,11 +21,20 @@
         <div class="logo-tagline">Hackathon Engine</div>
       </div>
     </a>
-    <div class="nav-buttons">
-      <a href="{% url 'landing' %}" class="btn btn-secondary">
-        <i data-lucide="home" style="width: 16px; height: 16px;"></i> Home
+    <div class="nav-buttons" style="display: flex; align-items: center; gap: 12px;">
+      <a href="{% url 'landing' %}" class="btn btn-secondary" style="height: 38px; padding: 0 16px; font-size: 13px;">
+        <i data-lucide="home" style="width: 14px; height: 14px;"></i> Home
       </a>
       {% block nav_actions %}{% endblock %}
+      {% if request.session.username %}
+        <span style="font-size: 13px; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border-left: 1px solid var(--glass-border); border-right: 1px solid var(--glass-border); height: 24px;">
+          <i data-lucide="user" style="width: 14px; height: 14px; color: var(--accent-cyan);"></i>
+          <span style="font-weight: 700;">{{ request.session.username }}</span> ({{ request.session.user_role|capfirst }})
+        </span>
+        <a href="{% url 'logout' %}" class="btn btn-danger" style="height: 38px; padding: 0 16px; font-size: 13px;">
+          <i data-lucide="log-out" style="width: 14px; height: 14px;"></i> Log Out
+        </a>
+      {% endif %}
     </div>
   </header>
 

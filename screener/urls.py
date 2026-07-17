@@ -7,4 +7,7 @@ urlpatterns = [
     path('student/', views.student_dashboard, name='student_dashboard'),
     path('college/', views.college_dashboard, name='college_dashboard'),
     path('decision/<int:candidate_id>/<str:decision_type>/', views.send_decision_email, name='send_decision_email'),
+    path('login/', views.login_view, name='login'),
+    path('signup/', views.signup_view, name='signup'),
+    path('logout/', views.logout_view, name='logout'),
 ]

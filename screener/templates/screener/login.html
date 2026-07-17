@@ -1,0 +1,182 @@
+{% extends 'screener/base.html' %}
+
+{% block title %}ResumeSphere AI - Login Gate{% endblock %}
+
+{% block nav_actions %}
+<a href="{% url 'landing' %}" class="btn btn-secondary">
+  <i data-lucide="home" style="width: 16px; height: 16px;"></i> Landing Gate
+</a>
+{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: center; min-height: 70vh; padding: 20px 0;">
+  <div class="glass-card" style="width: 100%; max-width: 480px; padding: 40px; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);">
+    
+    <!-- Header visual -->
+    <div style="text-align: center; margin-bottom: 30px;">
+      <div style="display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 16px; background: rgba(59, 130, 246, 0.1); border: 1px solid var(--glass-border); color: var(--accent-blue); font-size: 32px; margin-bottom: 12px;" id="auth-icon-box">
+        <i data-lucide="lock" style="width: 32px; height: 32px;" id="auth-icon-indicator"></i>
+      </div>
+      <h3 style="font-size: 24px; font-weight: 800; color: var(--text-primary);" id="auth-title-label">Login to Recruiter Space</h3>
+      <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;" id="auth-subtitle-label">Access your recruiter screening cockpits & candidate leaderboards.</p>
+    </div>
+
+    <!-- Login Form -->
+    <form method="POST" id="auth-form" style="display: flex; flex-direction: column; gap: 20px;">
+      {% csrf_token %}
+      
+      <!-- Hidden Role Field -->
+      <input type="hidden" name="role" id="form-role-input" value="{{ role }}">
+
+      <!-- Username Input -->
+      <div class="form-group">
+        <label for="username" style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Username</label>
+        <input type="text" name="username" id="username" class="form-input" style="width: 100%;" placeholder="Enter username..." required>
+      </div>
+
+      <!-- Password Input -->
+      <div class="form-group">
+        <label for="password" style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Password</label>
+        <input type="password" name="password" id="password" class="form-input" style="width: 100%;" placeholder="Enter secure password..." required>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="height: 50px; font-size: 15px; width: 100%; margin-top: 10px;" id="submit-btn-element">
+        Authenticate & Enter Space
+      </button>
+
+      <p style="font-size: 13px; color: var(--text-secondary); text-align: center; margin-top: 10px;">
+        New to ResumeSphere? <a href="{% url 'signup' %}?role={{ role }}" id="signup-link-element" style="color: var(--accent-cyan); font-weight: 700; text-decoration: none;">Create an account</a>
+      </p>
+    </form>
+
+    <!-- Divider -->
+    <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin: 30px 0 20px 0;">
+      <span style="height: 1px; background: var(--glass-border); flex-grow: 1;"></span>
+      <span style="font-size: 11px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 1px;">Target Workspace</span>
+      <span style="height: 1px; background: var(--glass-border); flex-grow: 1;"></span>
+    </div>
+
+    <!-- Workspace selector buttons at the bottom -->
+    <div style="display: flex; flex-direction: column; gap: 10px;" id="role-selector-container">
+      <button type="button" class="workspace-btn {% if role == 'recruiter' %}active{% endif %}" data-role="recruiter" onclick="selectWorkspaceRole('recruiter')">
+        <i data-lucide="briefcase" style="width: 16px; height: 16px;"></i> Recruiter Workspace
+      </button>
+      <button type="button" class="workspace-btn {% if role == 'student' %}active{% endif %}" data-role="student" onclick="selectWorkspaceRole('student')">
+        <i data-lucide="graduation-cap" style="width: 16px; height: 16px;"></i> Student Workspace
+      </button>
+      <button type="button" class="workspace-btn {% if role == 'college' %}active{% endif %}" data-role="college" onclick="selectWorkspaceRole('college')">
+        <i data-lucide="building" style="width: 16px; height: 16px;"></i> College Workspace
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<style>
+  .workspace-btn {
+    width: 100%;
+    height: 46px;
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.01);
+    color: var(--text-secondary);
+    font-size: 13.5px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+  }
+  .workspace-btn:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-primary);
+  }
+  
+  /* Active states depending on role type colors */
+  .workspace-btn[data-role="recruiter"].active {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: var(--accent-blue);
+    color: var(--text-primary);
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+  }
+  .workspace-btn[data-role="student"].active {
+    background: rgba(6, 182, 212, 0.15);
+    border-color: var(--accent-cyan);
+    color: var(--text-primary);
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.2);
+  }
+  .workspace-btn[data-role="college"].active {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: var(--accent-purple);
+    color: var(--text-primary);
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.2);
+  }
+</style>
+
+<script>
+  // Function to handle interactive workspace selection at the bottom
+  function selectWorkspaceRole(role) {
+    // 1. Update active button classes
+    document.querySelectorAll('#role-selector-container button').forEach(btn => {
+      btn.classList.remove('active');
+    });
+    
+    const activeBtn = document.querySelector(`#role-selector-container button[data-role="${role}"]`);
+    if (activeBtn) {
+      activeBtn.classList.add('active');
+    }
+    
+    // 2. Set hidden input
+    document.getElementById('form-role-input').value = role;
+    
+    // 3. Update dynamic links
+    const signupLink = document.getElementById('signup-link-element');
+    if (signupLink) {
+      signupLink.href = `{% url 'signup' %}?role=${role}`;
+    }
+    
+    // 4. Update colors and text labels based on selected role
+    const iconBox = document.getElementById('auth-icon-box');
+    const iconInd = document.getElementById('auth-icon-indicator');
+    const titleLabel = document.getElementById('auth-title-label');
+    const subtitleLabel = document.getElementById('auth-subtitle-label');
+    const submitBtn = document.getElementById('submit-btn-element');
+    
+    if (role === 'recruiter') {
+      iconBox.style.color = 'var(--accent-blue)';
+      iconBox.style.background = 'rgba(59, 130, 246, 0.1)';
+      iconBox.style.borderColor = 'var(--glass-border)';
+      iconInd.setAttribute('data-lucide', 'briefcase');
+      titleLabel.innerText = "Login to Recruiter Space";
+      subtitleLabel.innerText = "Access your recruiter screening cockpits & candidate leaderboards.";
+      submitBtn.style.background = 'var(--accent-gradient)';
+    } else if (role === 'student') {
+      iconBox.style.color = 'var(--accent-cyan)';
+      iconBox.style.background = 'rgba(6, 182, 212, 0.1)';
+      iconBox.style.borderColor = 'rgba(6, 182, 212, 0.2)';
+      iconInd.setAttribute('data-lucide', 'graduation-cap');
+      titleLabel.innerText = "Login to Student Space";
+      subtitleLabel.innerText = "Check your placement compatibility, scores, and up-skilling guides.";
+      submitBtn.style.background = 'linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 100%)';
+    } else if (role === 'college') {
+      iconBox.style.color = 'var(--accent-purple)';
+      iconBox.style.background = 'rgba(139, 92, 246, 0.1)';
+      iconBox.style.borderColor = 'rgba(139, 92, 246, 0.2)';
+      iconInd.setAttribute('data-lucide', 'building');
+      titleLabel.innerText = "Login to College Space";
+      subtitleLabel.innerText = "Manage corporate recruiting partners and view placement metrics.";
+      submitBtn.style.background = 'linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-blue) 100%)';
+    }
+    
+    // Refresh lucide icons dynamically
+    lucide.createIcons();
+  }
+  
+  // Run on page load
+  window.addEventListener('DOMContentLoaded', () => {
+    selectWorkspaceRole('{{ role }}');
+  });
+</script>
+{% endblock %}
