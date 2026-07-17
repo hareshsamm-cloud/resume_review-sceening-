@@ -566,7 +566,7 @@ def student_dashboard(request):
     # Store temporary session profile info to allow dynamic target role toggling
     session_profile = request.session.get('student_profile')
 
-    if request.method == 'POST' and 'upload_resume' in request.FILES:
+    if request.method == 'POST' and 'resume' in request.FILES:
         file = request.FILES['resume']
         text = ""
         
