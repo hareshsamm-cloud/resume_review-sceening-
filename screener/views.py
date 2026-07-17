@@ -37,11 +37,24 @@ def recruiter_dashboard(request):
     email_logs = EmailLog.objects.all().order_by('-sent_at')
     
     # Selected filters / inputs
-    selected_role_key = request.POST.get('job_role', 'frontend')
-    req_skills_str = request.POST.get('skills_required', 'React, TypeScript, HTML, CSS, Next.js')
-    min_exp_str = request.POST.get('min_experience', '2.0')
-    target_count_str = request.POST.get('target_count', '3')
+    # Load filters / inputs from session, falling back to frontend defaults
+    selected_role_key = request.session.get('job_role', 'frontend')
+    req_skills_str = request.session.get('skills_required', 'React, TypeScript, HTML, CSS, Next.js')
+    min_exp_str = request.session.get('min_experience', '2.0')
+    target_count_str = request.session.get('target_count', '3')
     
+    if request.method == 'POST':
+        selected_role_key = request.POST.get('job_role', selected_role_key)
+        req_skills_str = request.POST.get('skills_required', req_skills_str)
+        min_exp_str = request.POST.get('min_experience', min_exp_str)
+        target_count_str = request.POST.get('target_count', target_count_str)
+        
+        # Save updated variables in the session
+        request.session['job_role'] = selected_role_key
+        request.session['skills_required'] = req_skills_str
+        request.session['min_experience'] = min_exp_str
+        request.session['target_count'] = target_count_str
+        
     try:
         min_exp = float(min_exp_str)
     except ValueError:
@@ -242,7 +255,64 @@ def recruiter_dashboard(request):
             
         return redirect('recruiter_dashboard')
 
+    # Recalculate match details dynamically for all candidates in DB based on current filters
     all_candidates = Candidate.objects.all()
+    req_skills = [s.strip().lower() for s in req_skills_str.split(',') if s.strip()]
+    
+    for cand in all_candidates:
+        candidate_skills = [s.strip() for s in cand.skills.split(',') if s.strip()]
+        candidate_skills_lower = [s.lower() for s in candidate_skills]
+        candidate_exp = cand.experience_years
+        
+        # Skills score matching
+        matched_reqs = [r for r in req_skills if r in candidate_skills_lower]
+        skills_score = (len(matched_reqs) / len(req_skills)) * 100 if req_skills else 100
+        
+        # Experience score matching
+        if candidate_exp >= min_exp:
+            exp_score = 100
+        else:
+            exp_score = (candidate_exp / min_exp) * 100 if min_exp > 0 else 100
+            
+        overall_score = round(0.7 * skills_score + 0.3 * exp_score)
+        
+        if overall_score >= 80:
+            fit = "Strong Match"
+        elif overall_score >= 60:
+            fit = "Good Match"
+        elif overall_score >= 40:
+            fit = "Partial Match"
+        else:
+            fit = "Poor Match"
+            
+        # Impressive highlights
+        impressive = []
+        if len(matched_reqs) > 0:
+            skills_caps = [s.capitalize() for s in matched_reqs]
+            impressive.append(f"Matches required skills: {', '.join(skills_caps[:4])}")
+        if candidate_exp >= min_exp:
+            impressive.append(f"Exceeds experience requirement with {candidate_exp} years (required {min_exp} years)")
+        else:
+            impressive.append(f"Possesses {candidate_exp} years of relevant experience")
+            
+        extra_skills = [s for s in candidate_skills if s.lower() not in req_skills]
+        if extra_skills:
+            impressive.append(f"Brings auxiliary expertise in: {', '.join(extra_skills[:3])}")
+            
+        # Gaps / Needs
+        gaps = []
+        missing_reqs = [r.capitalize() for r in req_skills if r not in candidate_skills_lower]
+        if missing_reqs:
+            gaps.append(f"Lacks core technologies: {', '.join(missing_reqs[:4])}")
+        if candidate_exp < min_exp:
+            gaps.append(f"Experience deficit: {round(min_exp - candidate_exp, 1)} years short of requested {min_exp} years")
+            
+        # Update db fields
+        cand.match_score = overall_score
+        cand.fit_assessment = fit
+        cand.impressive_summary = "||".join(impressive)
+        cand.requirements_needed = "||".join(gaps)
+        cand.save()
     total_count = all_candidates.count()
     
     scanned_candidates = list(Candidate.objects.filter(decision="Pending").order_by('-match_score'))
@@ -352,16 +422,16 @@ def student_dashboard(request):
         role_title = JOB_ROLES.get(target_role, {"title": "Software Engineer"})["title"]
         
         if len(eligible) > 0:
-            eligibility_status = f"You are currently eligible for **{len(eligible)} companies** as a **{role_title}** ({', '.join(matched_companies_names[:3])})."
+            eligibility_status = f"You are currently eligible for {len(eligible)} companies as a {role_title} ({', '.join(matched_companies_names[:3])})."
         else:
-            eligibility_status = f"You are currently close to matching several top tech companies for **{role_title}** roles."
+            eligibility_status = f"You are currently close to matching several top tech companies for {role_title} roles."
             
         summary_highlight = (
-            f"Based on our analysis, **{candidate_profile['name']}** is a competent **{primary_skill} Engineer** "
-            f"with an estimated **{exp_text} of experience**. Your profile reflects key strengths in **{skills_badges_str}**. "
+            f"Based on our analysis, {candidate_profile['name']} is a competent {primary_skill} Engineer "
+            f"with an estimated {exp_text} of experience. Your profile reflects key strengths in {skills_badges_str}. "
             f"{eligibility_status} To boost your eligibility for premier targets (like "
             f"{', '.join([a['name'] for a in aspirational[:2]]) if aspirational else 'Google or Stripe'}), focus on building "
-            f"skills in **{', '.join([s for a in aspirational[:2] for s in a['missing_skills'][:2]]) if aspirational else 'System Design and Algorithms'}**."
+            f"skills in {', '.join([s for a in aspirational[:2] for s in a['missing_skills'][:2]]) if aspirational else 'System Design and Algorithms'}."
         )
 
     context = {
