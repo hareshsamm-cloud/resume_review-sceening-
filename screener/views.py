@@ -9,6 +9,7 @@ from django.contrib.auth.hashers import make_password, check_password
 from .models import Candidate, EmailLog, RecruiterAccount, StudentAccount, CollegeAccount, PlacementConfig, ReportedProfile
 from .parser import extract_text_from_pdf, parse_resume_full
 from .recommender import get_company_recommendations_by_role
+from .validator import run_authenticity_audit
 from .companies_data import COMPANIES_DATABASE
 
 def get_rejections_after_upgrade(email):
@@ -430,114 +431,76 @@ def recruiter_dashboard(request):
         cand.fit_assessment = fit
         cand.impressive_summary = "||".join(impressive)
         cand.requirements_needed = "||".join(gaps)
+
+        # Run Anomaly / Authenticity Audits using our new modular validator
+        is_suspicious, reasons, audit_scores = run_authenticity_audit(
+            name=cand.name,
+            email=cand.email,
+            phone=cand.phone,
+            skills=candidate_skills,
+            experience_years=cand.experience_years,
+            resume_text=cand.resume_text
+        )
+        cand.is_suspicious = is_suspicious
+        cand.suspicious_reasons = reasons
+        
+        # Save assessment results to database
+        cand.quality_score = audit_scores["quality_score"]
+        cand.authenticity_score = audit_scores["authenticity_score"]
+        cand.fraud_score = audit_scores["fraud_score"]
+        cand.communication_score = audit_scores["communication_score"]
+        cand.tech_depth_score = audit_scores["tech_depth_score"]
+        cand.learning_score = audit_scores["learning_score"]
+
+        # Calculate Explainability & Summary
+        pos = []
+        neg = []
+        for s in matched_reqs:
+            pos.append(f"+15 Skill matched: {s.capitalize()}")
+        for s in candidate_skills:
+            if s.lower() not in req_skills:
+                pos.append(f"+5 Extra skill: {s}")
+        if cand.experience_years >= min_exp:
+            pos.append(f"+30 Meets experience requirement ({cand.experience_years} yrs)")
+        else:
+            neg.append(f"-10 Experience deficit of {round(min_exp - cand.experience_years, 1)} yrs")
+        for s in req_skills:
+            if s not in candidate_skills_lower:
+                neg.append(f"-10 Lacks skill: {s.capitalize()}")
+        
+        cand.explainability_positive = "||".join(pos)
+        cand.explainability_negative = "||".join(neg)
+
+        # AI candidate summary
+        skills_badge = ", ".join(candidate_skills[:4])
+        rec_status = "highly recommended for technical review" if cand.match_score >= 80 else "recommended with reservations" if cand.match_score >= 50 else "not recommended for this role"
+        cand.ai_summary = f"{cand.name} displays competence in {skills_badge or 'Software Engineering'} with {cand.experience_years} years of relevant experience. Their profile scored a {cand.match_score}% job match with a {cand.quality_score}% layout quality index and a low {cand.fraud_score}% fraud risk. They are {rec_status}."
+
+        # Stress Test
+        g_skills = ["python", "go", "java", "algorithms", "system design"]
+        g_match = sum(1 for s in candidate_skills_lower if s in g_skills)
+        g_score = round(0.7 * (g_match / len(g_skills) * 100) + 0.3 * (100 if cand.experience_years >= 4.0 else (cand.experience_years / 4.0 * 100)))
+        
+        a_skills = ["aws", "sql", "java", "docker", "kubernetes"]
+        a_match = sum(1 for s in candidate_skills_lower if s in a_skills)
+        a_score = round(0.7 * (a_match / len(a_skills) * 100) + 0.3 * (100 if cand.experience_years >= 3.0 else (cand.experience_years / 3.0 * 100)))
+
+        s_skills = ["ruby", "python", "go", "apis", "react", "sql"]
+        s_match = sum(1 for s in candidate_skills_lower if s in s_skills)
+        s_score = round(0.7 * (s_match / len(s_skills) * 100) + 0.3 * (100 if cand.experience_years >= 3.0 else (cand.experience_years / 3.0 * 100)))
+
+        m_skills = ["c#", "c++", "java", "azure", "sql", "git"]
+        m_match = sum(1 for s in candidate_skills_lower if s in m_skills)
+        m_score = round(0.7 * (m_match / len(m_skills) * 100) + 0.3 * (100 if cand.experience_years >= 2.0 else (cand.experience_years / 2.0 * 100)))
+
+        z_skills = ["java", "php", "javascript", "html", "css", "sql"]
+        z_match = sum(1 for s in candidate_skills_lower if s in z_skills)
+        z_score = round(0.7 * (z_match / len(z_skills) * 100) + 0.3 * (100 if cand.experience_years >= 1.0 else (cand.experience_years / 1.0 * 100)))
+
+        cand.stress_test_scores = f"Google:{max(35, g_score)}||Amazon:{max(35, a_score)}||Stripe:{max(35, s_score)}||Microsoft:{max(35, m_score)}||Zoho:{max(35, z_score)}"
+
         cand.save()
-
-        # Run Anomaly / Authenticity Audits in-memory
-        cand.is_suspicious = False
-        cand.suspicious_reasons = []
         
-        # 1. Personal Information Validation Rules (Rules 1, 3, 4, 5, 6)
-        if cand.name.strip() == "" or cand.name == "Unknown Candidate":
-            cand.is_suspicious = True
-            cand.suspicious_reasons.append("Personal Info Anomaly: Candidate name field is empty or unknown.")
-        elif not re.match(r'^[a-zA-Z\s\.]+$', cand.name):
-            cand.is_suspicious = True
-            cand.suspicious_reasons.append("Personal Info Anomaly: Candidate name contains invalid special characters.")
-
-        if cand.email != "No email found":
-            if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', cand.email):
-                cand.is_suspicious = True
-                cand.suspicious_reasons.append(f"Personal Info Anomaly: Invalid email formatting syntax ('{cand.email}').")
-        else:
-            cand.is_suspicious = True
-            cand.suspicious_reasons.append("Missing primary contact details (No email address found).")
-
-        if cand.phone != "No phone found":
-            if any(c.isalpha() for c in cand.phone):
-                cand.is_suspicious = True
-                cand.suspicious_reasons.append("Personal Info Anomaly: Phone number contains invalid letters.")
-            phone_digits = "".join(c for c in cand.phone if c.isdigit())
-            if len(phone_digits) < 10 or len(phone_digits) > 15:
-                cand.is_suspicious = True
-                cand.suspicious_reasons.append(f"Personal Info Anomaly: Phone digit length is invalid (must be 10-15 digits, parsed {len(phone_digits)}).")
-            if re.search(r'(\d)\1{7,}', phone_digits) or "12345678" in phone_digits or "98765432" in phone_digits:
-                cand.is_suspicious = True
-                cand.suspicious_reasons.append("Personal Info Anomaly: Phone number contains suspicious repeating or sequential digits.")
-        else:
-            cand.is_suspicious = True
-            cand.suspicious_reasons.append("Missing primary contact details (No phone number found).")
-
-        # Heuristic 4: Suspicious/Disposable Email Domain
-        suspicious_domains = ["example.com", "test.com", "temp.com", "mailinator.com", "yopmail.com", "tempmail.com", "10minutemail.com", "sharklasers.com", "guerrillamail.com"]
-        email_domain = cand.email.split('@')[-1].lower() if '@' in cand.email else ""
-        if any(sd in email_domain for sd in suspicious_domains):
-            cand.is_suspicious = True
-            cand.suspicious_reasons.append(f"Suspicious email domain: @{email_domain} (disposable/test provider).")
-
-        # 3. Keyword Stuffing / Spam Validation (Rules 21, 28, 30, 35)
-        if len(candidate_skills) > 20:
-            cand.is_suspicious = True
-            cand.suspicious_reasons.append(f"Keyword Stuffing Anomaly: Abnormally high skill density ({len(candidate_skills)} unique frameworks; limit is 20).")
-
-        # Check for 3+ consecutive repeating identical words (e.g. "Google Google Google")
-        if re.search(r'\b(\w+)\s+\1\s+\1\b', cand.resume_text.lower()):
-            cand.is_suspicious = True
-            cand.suspicious_reasons.append("Keyword Stuffing Anomaly: Found 3+ consecutive repeating identical words (Stuffer pattern).")
-
-        # Buzzword abuse checker
-        buzzwords = ["guru", "rockstar", "ninja", "legend", "visionary"]
-        resume_lower = cand.resume_text.lower()
-        matched_buzz = [b for b in buzzwords if re.search(rf"\b{b}\b", resume_lower)]
-        if matched_buzz:
-            cand.is_suspicious = True
-            cand.suspicious_reasons.append(f"Buzzword Anomaly: Resume contains clickbait/abuse buzzwords ({', '.join(matched_buzz)}).")
-
-        # 4. Certification Timeline & Plausibility Validation (Rule 73)
-        tech_release_years = {
-            "React": 2013,
-            "Docker": 2013,
-            "Kubernetes": 2014,
-            "TensorFlow": 2015,
-            "PyTorch": 2016,
-            "Flutter": 2017,
-            "LangChain": 2022,
-            "ChatGPT": 2022
-        }
-        for tech, release_year in tech_release_years.items():
-            pattern = rf"{tech.lower()}[^.\n]*?\b(19\d{{2}}|200\d|201[0-2])\b"
-            if re.search(pattern, resume_lower):
-                cand.is_suspicious = True
-                cand.suspicious_reasons.append(f"Certification Timeline Anomaly: Claims certification or expertise in {tech} before its release year ({release_year}).")
-
-        # Heuristic: Timeline Plausibility Anomaly (ChatGPT/GenAI check, lowered to > 3.0 years)
-        if any(buzz in resume_lower for buzz in ["chatgpt", "gpt-4", "prompt engineering", "langchain", "llama"]) and cand.experience_years > 3.0:
-            regex_genai = r'(?:3|4|5|6|7|8|9|\d{2,})\+?\s*(?:years?|yrs?)[^.\n]*(?:chatgpt|gpt-4|prompt engineering|langchain|llama|generative ai)'
-            if re.search(regex_genai, resume_lower):
-                cand.is_suspicious = True
-                cand.suspicious_reasons.append("Certification Timeline Anomaly: Claims >3 years of experience in post-2022 Generative AI/LLMs.")
-
-        # Heuristic: Cross-Domain Tech Conflict (Rule 36)
-        web_skills = {"react", "typescript", "html", "css", "vue", "angular"}
-        ai_skills = {"pytorch", "tensorflow", "deep learning", "machine learning", "nlp"}
-        blockchain_skills = {"solidity", "ethereum", "smart contracts", "web3"}
-        game_skills = {"unity", "unreal engine", "c#"}
-        
-        active_domains = 0
-        if any(s in candidate_skills_lower for s in web_skills): active_domains += 1
-        if any(s in candidate_skills_lower for s in ai_skills): active_domains += 1
-        if any(s in candidate_skills_lower for s in blockchain_skills): active_domains += 1
-        if any(s in candidate_skills_lower for s in game_skills): active_domains += 1
-        
-        if active_domains >= 3:
-            cand.is_suspicious = True
-            cand.suspicious_reasons.append(f"Multi-Stack Anomaly: Claims expert proficiency in {active_domains} unrelated tech domains (Web, AI, Blockchain, Game Dev).")
-
-        # Heuristic: Senior target role experience mismatch (Rule 40/63)
-        current_role_title = JOB_ROLES.get(selected_role_key, {}).get("title", "")
-        if ("Architect" in current_role_title or "Lead" in current_role_title or "Senior" in current_role_title) and cand.experience_years < 2.0:
-            cand.is_suspicious = True
-            cand.suspicious_reasons.append(f"Seniority Mismatch Anomaly: Targeting a senior/architect role with only {cand.experience_years} years of experience.")
-
         # Create ReportedProfile if this candidate is suspicious and not already reported
         if cand.is_suspicious:
             if not ReportedProfile.objects.filter(email=cand.email).exists():
@@ -550,6 +513,7 @@ def recruiter_dashboard(request):
                     reasons="||".join(cand.suspicious_reasons),
                     resume_text=cand.resume_text
                 )
+
 
     # In-memory partitioning to preserve properties
     scanned_candidates = [c for c in all_candidates if c.decision == "Pending"]
@@ -612,6 +576,8 @@ def student_dashboard(request):
     if student:
         rejections_after_upgrade = get_rejections_after_upgrade(student.email)
 
+    session_profile = request.session.get('student_profile')
+
     if request.method == 'POST' and 'resume' in request.FILES:
         if student and student.is_blacklisted:
             messages.error(request, f"Your account has been BLACKLISTED. You cannot submit resumes.")
@@ -627,98 +593,25 @@ def student_dashboard(request):
             
         if text.strip():
             parsed = parse_resume_full(text)
-            
-            # Student-side Authenticity Checks
-            is_suspicious = False
-            reasons = []
-            
-            cand_name = parsed["name"] if parsed["name"] != "Unknown Candidate" else os.path.splitext(file.name)[0].replace('_', ' ').replace('-', ' ').title()
-            cand_email = parsed["email"]
+            cand_name = parsed["name"]
+            # Use student's email as candidate email if matching to ensure linked account integrity
+            cand_email = student.email if student else (parsed["email"] if parsed["email"] != "No email found" else f"{parsed['name'].lower().replace(' ', '')}@example.com")
             cand_phone = parsed["phone"]
             candidate_skills = parsed["skills"]
-            candidate_skills_lower = [s.lower() for s in candidate_skills]
             candidate_exp = parsed["experience_years"]
-            resume_lower = text.lower()
+            candidate_skills_lower = [s.lower() for s in candidate_skills]
             
-            if not cand_name.strip() or cand_name == "Unknown Candidate":
-                is_suspicious = True
-                reasons.append("Personal Info Anomaly: Candidate name field is empty or unknown.")
-            elif not re.match(r'^[a-zA-Z\s\.]+$', cand_name):
-                is_suspicious = True
-                reasons.append("Personal Info Anomaly: Candidate name contains invalid special characters.")
-
-            if cand_email != "No email found":
-                if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', cand_email):
-                    is_suspicious = True
-                    reasons.append(f"Personal Info Anomaly: Invalid email formatting syntax ('{cand_email}').")
-            else:
-                is_suspicious = True
-                reasons.append("Missing primary contact details (No email address found).")
-
-            if cand_phone != "No phone found":
-                if any(c.isalpha() for c in cand_phone):
-                    is_suspicious = True
-                    reasons.append("Personal Info Anomaly: Phone number contains invalid letters.")
-                phone_digits = "".join(c for c in cand_phone if c.isdigit())
-                if len(phone_digits) < 10 or len(phone_digits) > 15:
-                    is_suspicious = True
-                    reasons.append("Personal Info Anomaly: Phone digit length is invalid.")
-                if re.search(r'(\d)\1{7,}', phone_digits) or "12345678" in phone_digits or "98765432" in phone_digits:
-                    is_suspicious = True
-                    reasons.append("Personal Info Anomaly: Phone number contains suspicious repeating or sequential digits.")
-            else:
-                is_suspicious = True
-                reasons.append("Missing primary contact details (No phone number found).")
-
-            suspicious_domains = ["example.com", "test.com", "temp.com", "mailinator.com", "yopmail.com", "tempmail.com", "10minutemail.com", "sharklasers.com", "guerrillamail.com"]
-            email_domain = cand_email.split('@')[-1].lower() if '@' in cand_email else ""
-            if any(sd in email_domain for sd in suspicious_domains):
-                is_suspicious = True
-                reasons.append(f"Suspicious email domain: @{email_domain} (disposable provider).")
-
-            if len(candidate_skills) > 20:
-                is_suspicious = True
-                reasons.append(f"Keyword Stuffing Anomaly: Abnormally high skill density ({len(candidate_skills)} unique frameworks; limit is 20).")
-
-            if re.search(r'\b(\w+)\s+\1\s+\1\b', resume_lower):
-                is_suspicious = True
-                reasons.append("Keyword Stuffing Anomaly: Found 3+ consecutive repeating identical words.")
-
-            buzzwords = ["guru", "rockstar", "ninja", "legend", "visionary"]
-            matched_buzz = [b for b in buzzwords if re.search(rf"\b{b}\b", resume_lower)]
-            if matched_buzz:
-                is_suspicious = True
-                reasons.append(f"Buzzword Anomaly: Resume contains clickbait buzzwords ({', '.join(matched_buzz)}).")
-
-            tech_release_years = {
-                "React": 2013, "Docker": 2013, "Kubernetes": 2014, "TensorFlow": 2015,
-                "PyTorch": 2016, "Flutter": 2017, "LangChain": 2022, "ChatGPT": 2022
-            }
-            for tech, release_year in tech_release_years.items():
-                pattern = rf"{tech.lower()}[^.\n]*?\b(19\d{{2}}|200\d|201[0-2])\b"
-                if re.search(pattern, resume_lower):
-                    is_suspicious = True
-                    reasons.append(f"Certification Timeline Anomaly: Claims expertise in {tech} before release ({release_year}).")
-
-            if any(buzz in resume_lower for buzz in ["chatgpt", "gpt-4", "prompt engineering", "langchain", "llama"]) and candidate_exp > 3.0:
-                regex_genai = r'(?:3|4|5|6|7|8|9|\d{2,})\+?\s*(?:years?|yrs?)[^.\n]*(?:chatgpt|gpt-4|prompt engineering|langchain|llama|generative ai)'
-                if re.search(regex_genai, resume_lower):
-                    is_suspicious = True
-                    reasons.append("Certification Timeline Anomaly: Claims >3 years of experience in post-2022 Generative AI.")
-
-            web_skills = {"react", "typescript", "html", "css", "vue", "angular"}
-            ai_skills = {"pytorch", "tensorflow", "deep learning", "machine learning", "nlp"}
-            blockchain_skills = {"solidity", "ethereum", "smart contracts", "web3"}
-            game_skills = {"unity", "unreal engine", "c#"}
-            active_domains = 0
-            if any(s in candidate_skills_lower for s in web_skills): active_domains += 1
-            if any(s in candidate_skills_lower for s in ai_skills): active_domains += 1
-            if any(s in candidate_skills_lower for s in blockchain_skills): active_domains += 1
-            if any(s in candidate_skills_lower for s in game_skills): active_domains += 1
-            if active_domains >= 3:
-                is_suspicious = True
-                reasons.append(f"Multi-Stack Anomaly: Claims expert proficiency in {active_domains} unrelated domains.")
-
+            # Student-side Authenticity Checks using our new modular validator
+            is_suspicious, reasons, audit_scores = run_authenticity_audit(
+                name=cand_name,
+                email=cand_email,
+                phone=cand_phone,
+                skills=candidate_skills,
+                experience_years=candidate_exp,
+                resume_text=text,
+                file_obj=file
+            )
+            
             # Apply Anti-gaming Warnings & Block Blacklist
             if is_suspicious:
                 if student:
@@ -741,6 +634,7 @@ def student_dashboard(request):
                         resume_text=text
                     )
                 return redirect('student_dashboard')
+
             else:
                 if student:
                     messages.success(request, "Resume authenticity verified! No anomalies detected.")
@@ -798,6 +692,53 @@ def student_dashboard(request):
                 if candidate_exp < min_exp:
                     gaps.append(f"Experience deficit: {round(min_exp - candidate_exp, 1)} years short")
 
+                # Generate explainability points
+                pos = []
+                neg = []
+                for s in matched_reqs:
+                    pos.append(f"+15 Skill matched: {s.capitalize()}")
+                for s in candidate_skills:
+                    if s.lower() not in req_skills:
+                        pos.append(f"+5 Extra skill: {s}")
+                if candidate_exp >= min_exp:
+                    pos.append(f"+30 Meets experience requirement ({candidate_exp} yrs)")
+                else:
+                    neg.append(f"-10 Experience deficit of {round(min_exp - candidate_exp, 1)} yrs")
+                for s in req_skills:
+                    if s not in candidate_skills_lower:
+                        neg.append(f"-10 Lacks skill: {s.capitalize()}")
+                
+                explainability_positive = "||".join(pos)
+                explainability_negative = "||".join(neg)
+
+                # AI candidate summary
+                skills_badge = ", ".join(candidate_skills[:4])
+                rec_status = "highly recommended for technical review" if overall_score >= 80 else "recommended with reservations" if overall_score >= 50 else "not recommended for this role"
+                ai_summary = f"{cand_name} displays competence in {skills_badge or 'Software Engineering'} with {candidate_exp} years of relevant experience. Their profile scored a {overall_score}% job match with a {audit_scores['quality_score']}% layout quality index and a low {audit_scores['fraud_score']}% fraud risk. They are {rec_status}."
+
+                # Stress Test
+                g_skills = ["python", "go", "java", "algorithms", "system design"]
+                g_match = sum(1 for s in candidate_skills_lower if s in g_skills)
+                g_score = round(0.7 * (g_match / len(g_skills) * 100) + 0.3 * (100 if candidate_exp >= 4.0 else (candidate_exp / 4.0 * 100)))
+                
+                a_skills = ["aws", "sql", "java", "docker", "kubernetes"]
+                a_match = sum(1 for s in candidate_skills_lower if s in a_skills)
+                a_score = round(0.7 * (a_match / len(a_skills) * 100) + 0.3 * (100 if candidate_exp >= 3.0 else (candidate_exp / 3.0 * 100)))
+
+                s_skills = ["ruby", "python", "go", "apis", "react", "sql"]
+                s_match = sum(1 for s in candidate_skills_lower if s in s_skills)
+                s_score = round(0.7 * (s_match / len(s_skills) * 100) + 0.3 * (100 if candidate_exp >= 3.0 else (candidate_exp / 3.0 * 100)))
+
+                m_skills = ["c#", "c++", "java", "azure", "sql", "git"]
+                m_match = sum(1 for s in candidate_skills_lower if s in m_skills)
+                m_score = round(0.7 * (m_match / len(m_skills) * 100) + 0.3 * (100 if candidate_exp >= 2.0 else (candidate_exp / 2.0 * 100)))
+
+                z_skills = ["java", "php", "javascript", "html", "css", "sql"]
+                z_match = sum(1 for s in candidate_skills_lower if s in z_skills)
+                z_score = round(0.7 * (z_match / len(z_skills) * 100) + 0.3 * (100 if candidate_exp >= 1.0 else (candidate_exp / 1.0 * 100)))
+
+                stress_test_scores = f"Google:{max(35, g_score)}||Amazon:{max(35, a_score)}||Stripe:{max(35, s_score)}||Microsoft:{max(35, m_score)}||Zoho:{max(35, z_score)}"
+
                 # Create or update candidate record in the recruiter database
                 existing_pending = Candidate.objects.filter(email=cand_email, decision="Pending").first()
                 if existing_pending:
@@ -810,6 +751,18 @@ def student_dashboard(request):
                     existing_pending.fit_assessment = fit
                     existing_pending.impressive_summary = "||".join(impressive)
                     existing_pending.requirements_needed = "||".join(gaps)
+                    
+                    # Update fingerprinting fields
+                    existing_pending.quality_score = audit_scores["quality_score"]
+                    existing_pending.authenticity_score = audit_scores["authenticity_score"]
+                    existing_pending.fraud_score = audit_scores["fraud_score"]
+                    existing_pending.communication_score = audit_scores["communication_score"]
+                    existing_pending.tech_depth_score = audit_scores["tech_depth_score"]
+                    existing_pending.learning_score = audit_scores["learning_score"]
+                    existing_pending.explainability_positive = explainability_positive
+                    existing_pending.explainability_negative = explainability_negative
+                    existing_pending.ai_summary = ai_summary
+                    existing_pending.stress_test_scores = stress_test_scores
                     existing_pending.save()
                 else:
                     Candidate.objects.create(
@@ -823,7 +776,19 @@ def student_dashboard(request):
                         fit_assessment=fit,
                         impressive_summary="||".join(impressive),
                         requirements_needed="||".join(gaps),
-                        decision="Pending"
+                        decision="Pending",
+                        
+                        # Set fingerprinting fields
+                        quality_score=audit_scores["quality_score"],
+                        authenticity_score=audit_scores["authenticity_score"],
+                        fraud_score=audit_scores["fraud_score"],
+                        communication_score=audit_scores["communication_score"],
+                        tech_depth_score=audit_scores["tech_depth_score"],
+                        learning_score=audit_scores["learning_score"],
+                        explainability_positive=explainability_positive,
+                        explainability_negative=explainability_negative,
+                        ai_summary=ai_summary,
+                        stress_test_scores=stress_test_scores
                     )
 
             session_profile = {
@@ -834,6 +799,7 @@ def student_dashboard(request):
                 "skills": candidate_skills
             }
             request.session['student_profile'] = session_profile
+            return redirect('student_dashboard')
             
     elif request.method == 'POST' and 'load_student_demo' in request.POST:
         if student and student.is_blacklisted:
@@ -848,8 +814,50 @@ def student_dashboard(request):
             "skills": ["React", "TypeScript", "HTML", "CSS", "APIs", "Git", "SQL"]
         }
         request.session['student_profile'] = session_profile
+        
+        # Pre-create candidate record for Sarah Jenkins
+        Candidate.objects.filter(email="sarah.jenkins@stanford.edu", decision="Pending").delete()
+        Candidate.objects.create(
+            name="Sarah Jenkins",
+            email="sarah.jenkins@stanford.edu",
+            phone="+1 (650) 499-1029",
+            skills="React,TypeScript,HTML,CSS,APIs,Git,SQL",
+            experience_years=2.5,
+            resume_text="Resume of Sarah Jenkins. Sarah has 2.5 years of experience in front-end developments using React, TypeScript, HTML, CSS and APIs.",
+            match_score=85,
+            fit_assessment="Strong Match",
+            impressive_summary="Matches required skills: React, TypeScript, HTML, CSS||Possesses 2.5 years of experience",
+            requirements_needed="",
+            decision="Pending",
+            quality_score=92,
+            authenticity_score=95,
+            fraud_score=5,
+            communication_score=88,
+            tech_depth_score=78,
+            learning_score=85,
+            explainability_positive="+15 Skill matched: React||+15 Skill matched: TypeScript||+30 Meets experience requirement (2.5 yrs)",
+            explainability_negative="",
+            ai_summary="Sarah Jenkins displays high competence in React, TypeScript, HTML with 2.5 years of relevant experience. Her profile scored an 85% job match with a 92% layout quality index and a low 5% fraud risk. She is highly recommended.",
+            stress_test_scores="Google:60||Amazon:75||Stripe:85||Microsoft:80||Zoho:90"
+        )
+        
         if not target_role:
             target_role = "frontend"
+        return redirect('student_dashboard')
+
+    cand_db = None
+    if student:
+        # Load from candidate database to sync session
+        cand_db = Candidate.objects.filter(email=student.email, decision="Pending").first()
+        if cand_db and not session_profile:
+            session_profile = {
+                "name": cand_db.name,
+                "email": cand_db.email,
+                "phone": cand_db.phone,
+                "experience": cand_db.experience_years,
+                "skills": cand_db.get_skills_list()
+            }
+            candidate_profile = session_profile
 
     if session_profile:
         candidate_profile = session_profile
@@ -882,6 +890,10 @@ def student_dashboard(request):
             f"skills in {', '.join([s for a in aspirational[:2] for s in a['missing_skills'][:2]]) if aspirational else 'System Design and Algorithms'}."
         )
 
+    # If matching database profile is still None but student is registered, see if we have any candidate matching student email
+    if student and not cand_db:
+        cand_db = Candidate.objects.filter(email=student.email).first()
+
     context = {
         'candidate_profile': candidate_profile,
         'eligible': eligible,
@@ -892,7 +904,8 @@ def student_dashboard(request):
         'companies': COMPANIES_DATABASE,
         'student': student,
         'max_fake_limit': max_fake_limit,
-        'rejections_after_upgrade': rejections_after_upgrade
+        'rejections_after_upgrade': rejections_after_upgrade,
+        'candidate': cand_db
     }
     return render(request, 'screener/student.html', context)
 

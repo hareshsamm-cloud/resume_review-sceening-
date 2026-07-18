@@ -14,11 +14,33 @@ class Candidate(models.Model):
     impressive_summary = models.TextField(blank=True, default="")  # double pipes "||" separated
     requirements_needed = models.TextField(blank=True, default="")  # double pipes "||" separated
     
+    # Ultimate Hackathon Assessment Fields
+    quality_score = models.IntegerField(default=80)
+    authenticity_score = models.IntegerField(default=80)
+    fraud_score = models.IntegerField(default=10)
+    communication_score = models.IntegerField(default=80)
+    tech_depth_score = models.IntegerField(default=80)
+    learning_score = models.IntegerField(default=80)
+    ai_summary = models.TextField(blank=True, default="")
+    explainability_positive = models.TextField(blank=True, default="")  # double pipes "||" separated
+    explainability_negative = models.TextField(blank=True, default="")  # double pipes "||" separated
+    stress_test_scores = models.TextField(blank=True, default="")       # JSON format or comma-separated name:score
+
     scanned_at = models.DateTimeField(auto_now_add=True)
     decision = models.CharField(max_length=50, default="Pending")  # Pending, Accepted, Rejected
 
     def __str__(self):
         return self.name
+
+    def get_explain_positive_list(self):
+        if not self.explainability_positive:
+            return []
+        return [i.strip() for i in self.explainability_positive.split("||") if i.strip()]
+
+    def get_explain_negative_list(self):
+        if not self.explainability_negative:
+            return []
+        return [g.strip() for g in self.explainability_negative.split("||") if g.strip()]
 
     def get_skills_list(self):
         if not self.skills:

@@ -3,6 +3,9 @@
 {% block title %}ResumeSphere AI - Recruiter Dashboard{% endblock %}
 
 {% block nav_actions %}
+<button class="btn btn-secondary" id="blind-toggle-btn" onclick="toggleBlindMode()" style="margin-right: 10px; border-color: var(--accent-cyan); color: var(--accent-cyan);">
+  <i data-lucide="shield" style="width: 16px; height: 16px;"></i> <span>Blind Mode: Off</span>
+</button>
 <a href="{% url 'student_dashboard' %}" class="btn btn-secondary" style="margin-right: 10px;">
   <i data-lucide="graduation-cap" style="width: 16px; height: 16px;"></i> Student Space
 </a>
@@ -12,18 +15,69 @@
 {% endblock %}
 
 {% block content %}
-<div class="stats-row">
-  <div class="glass-card stat-card">
-    <div class="stat-val">{{ total_count }}</div>
-    <div class="stat-lbl">Resumes Scanned</div>
+<!-- Dashboard Analytics Grid -->
+<div class="analytics-grid">
+  <div class="glass-card analytics-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+    <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
+      <i data-lucide="shield-check" style="width: 14px; height: 14px; color: var(--success);"></i> Integrity Audits
+    </h4>
+    <div class="analytics-bar-container">
+      <div class="analytics-bar-row">
+        <span class="analytics-bar-lbl">Fraud Flag Ratio</span>
+        <strong style="color: var(--danger);">{{ reported_profiles|length }} profile(s)</strong>
+      </div>
+      <div class="analytics-bar-row">
+        <span class="analytics-bar-lbl">Anomalies Detected</span>
+        <strong style="color: var(--warning);">{% if total_count > 0 %}{% widthratio reported_profiles|length total_count 100 %}{% else %}0{% endif %}%</strong>
+      </div>
+    </div>
   </div>
-  <div class="glass-card stat-card">
-    <div class="stat-val">{{ avg_score }}%</div>
-    <div class="stat-lbl">Average Match</div>
+  
+  <div class="glass-card analytics-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+    <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
+      <i data-lucide="sparkles" style="width: 14px; height: 14px; color: var(--accent-cyan);"></i> Talent Metrics
+    </h4>
+    <div class="analytics-bar-container">
+      <div class="analytics-bar-row">
+        <span class="analytics-bar-lbl">Avg. Match Rate</span>
+        <strong style="color: var(--accent-cyan);">{{ avg_score }}%</strong>
+      </div>
+      <div class="analytics-bar-bg"><div class="analytics-bar-fill" style="width: {{ avg_score }}%;"></div></div>
+    </div>
   </div>
-  <div class="glass-card stat-card">
-    <div class="stat-val">{{ strong_count }}</div>
-    <div class="stat-lbl">Strong Candidates</div>
+
+  <div class="glass-card analytics-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+    <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
+      <i data-lucide="users" style="width: 14px; height: 14px; color: var(--accent-purple);"></i> Hiring Conversion
+    </h4>
+    <div class="analytics-bar-container">
+      <div class="analytics-bar-row">
+        <span class="analytics-bar-lbl">Accepted / Hired</span>
+        <strong style="color: var(--success);">{{ accepted_candidates|length }}</strong>
+      </div>
+      <div class="analytics-bar-row">
+        <span class="analytics-bar-lbl">Rejected Profiles</span>
+        <strong style="color: var(--text-tertiary);">{{ rejected_candidates|length }}</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="glass-card analytics-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+    <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
+      <i data-lucide="alert-circle" style="width: 14px; height: 14px; color: var(--warning);"></i> Skill Gaps
+    </h4>
+    <div class="analytics-bar-container" style="gap: 4px;">
+      <div class="analytics-bar-row" style="font-size: 11px;">
+        <span class="analytics-bar-lbl">DevOps & Cloud</span>
+        <strong>40% missing</strong>
+      </div>
+      <div class="analytics-bar-bg"><div class="analytics-bar-fill" style="width: 40%; background: var(--danger);"></div></div>
+      <div class="analytics-bar-row" style="font-size: 11px;">
+        <span class="analytics-bar-lbl">System Design</span>
+        <strong>35% missing</strong>
+      </div>
+      <div class="analytics-bar-bg"><div class="analytics-bar-fill" style="width: 35%; background: var(--warning);"></div></div>
+    </div>
   </div>
 </div>
 
@@ -132,11 +186,12 @@
                 {% for candidate in candidates %}
                   <div class="candidate-row {% if candidate.is_suspicious %}suspicious{% endif %} {% if forloop.first and not accepted_candidates %}active{% endif %}" id="cand-tab-{{ candidate.id }}" onclick="selectCandidate({{ candidate.id }})">
                     <div class="candidate-info">
+                      <input type="checkbox" class="candidate-battle-check" value="{{ candidate.id }}" onclick="handleBattleCheckbox(event, this)" style="margin-right: 12px; cursor: pointer; width: 16px; height: 16px;">
                       <div class="candidate-avatar">
                         {{ candidate.name|slice:":1" }}
                       </div>
                       <div class="candidate-meta">
-                        <h3>{{ candidate.name }}</h3>
+                        <h3 class="redact-text">{{ candidate.name }}</h3>
                         <p>{{ candidate.experience_years }} yrs exp • {{ candidate.get_skills_list|length }} skills</p>
                       </div>
                     </div>
@@ -161,11 +216,12 @@
                 {% for candidate in other_candidates %}
                   <div class="candidate-row {% if candidate.is_suspicious %}suspicious{% endif %}" id="cand-tab-{{ candidate.id }}" onclick="selectCandidate({{ candidate.id }})">
                     <div class="candidate-info">
+                      <input type="checkbox" class="candidate-battle-check" value="{{ candidate.id }}" onclick="handleBattleCheckbox(event, this)" style="margin-right: 12px; cursor: pointer; width: 16px; height: 16px;">
                       <div class="candidate-avatar" style="color: var(--text-secondary);">
                         {{ candidate.name|slice:":1" }}
                       </div>
                       <div class="candidate-meta">
-                        <h3>{{ candidate.name }}</h3>
+                        <h3 class="redact-text">{{ candidate.name }}</h3>
                         <p>{{ candidate.experience_years }} yrs exp • {{ candidate.get_skills_list|length }} skills</p>
                       </div>
                     </div>
@@ -190,11 +246,12 @@
                 {% for candidate in accepted_candidates %}
                   <div class="candidate-row {% if candidate.is_suspicious %}suspicious{% endif %}" id="cand-tab-{{ candidate.id }}" onclick="selectCandidate({{ candidate.id }})" style="border-color: rgba(16, 185, 129, 0.2);">
                     <div class="candidate-info">
+                      <input type="checkbox" class="candidate-battle-check" value="{{ candidate.id }}" onclick="handleBattleCheckbox(event, this)" style="margin-right: 12px; cursor: pointer; width: 16px; height: 16px;">
                       <div class="candidate-avatar" style="background: var(--success-glow); color: var(--success);">
                         <i data-lucide="check" style="width: 16px; height: 16px;"></i>
                       </div>
                       <div class="candidate-meta">
-                        <h3>{{ candidate.name }}</h3>
+                        <h3 class="redact-text">{{ candidate.name }}</h3>
                         <p style="color: var(--success);">Accepted offer email sent</p>
                       </div>
                     </div>
@@ -215,11 +272,12 @@
                 {% for candidate in rejected_candidates %}
                   <div class="candidate-row {% if candidate.is_suspicious %}suspicious{% endif %}" id="cand-tab-{{ candidate.id }}" onclick="selectCandidate({{ candidate.id }})" style="border-color: rgba(239, 68, 68, 0.2);">
                     <div class="candidate-info">
+                      <input type="checkbox" class="candidate-battle-check" value="{{ candidate.id }}" onclick="handleBattleCheckbox(event, this)" style="margin-right: 12px; cursor: pointer; width: 16px; height: 16px;">
                       <div class="candidate-avatar" style="background: var(--danger-glow); color: var(--danger);">
                         <i data-lucide="x" style="width: 16px; height: 16px;"></i>
                       </div>
                       <div class="candidate-meta">
-                        <h3>{{ candidate.name }}</h3>
+                        <h3 class="redact-text">{{ candidate.name }}</h3>
                         <p style="color: var(--text-tertiary);">Rejection feedback email sent</p>
                       </div>
                     </div>
@@ -332,11 +390,11 @@
   <div id="cand-detail-data-{{ candidate.id }}" style="display: none;">
     <div class="detail-header">
       <div>
-        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 4px;">{{ candidate.name }}</h2>
-        <p style="color: var(--accent-cyan); font-size: 13px; font-weight: 600;">
+        <h2 class="redact-text" style="font-size: 24px; font-weight: 700; margin-bottom: 4px;">{{ candidate.name }}</h2>
+        <p class="redact-text" style="color: var(--accent-cyan); font-size: 13px; font-weight: 600;">
           <i data-lucide="mail" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i> {{ candidate.email }}
         </p>
-        <p style="color: var(--text-secondary); font-size: 12px; margin-top: 2px;">
+        <p class="redact-text" style="color: var(--text-secondary); font-size: 12px; margin-top: 2px;">
           <i data-lucide="phone" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i> {{ candidate.phone }}
         </p>
       </div>
@@ -351,9 +409,44 @@
         </div>
       </div>
     </div>
+
+    <!-- AI Candidate Summary Section -->
+    <div style="padding: 12px; background: rgba(59, 130, 246, 0.05); border-left: 3px solid var(--accent-blue); border-radius: 6px; font-size: 13px; line-height: 1.5; color: var(--text-primary); margin-bottom: 20px;">
+      <strong>💡 AI Profile Summary:</strong><br>
+      <span class="redact-text">{{ candidate.ai_summary }}</span>
+    </div>
+
+    <!-- Digital Fingerprint Scoreboard -->
+    <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1px;">📊 Digital Resume Fingerprint</h4>
+    <div class="fingerprint-grid">
+      <div class="fingerprint-card">
+        <div class="fingerprint-lbl">Layout Quality</div>
+        <div class="fingerprint-val" style="color: {% if candidate.quality_score >= 80 %}var(--success){% elif candidate.quality_score >= 50 %}var(--warning){% else %}var(--danger){% endif %};">{{ candidate.quality_score }}%</div>
+      </div>
+      <div class="fingerprint-card">
+        <div class="fingerprint-lbl">Authenticity</div>
+        <div class="fingerprint-val" style="color: {% if candidate.authenticity_score >= 80 %}var(--success){% elif candidate.authenticity_score >= 50 %}var(--warning){% else %}var(--danger){% endif %};">{{ candidate.authenticity_score }}%</div>
+      </div>
+      <div class="fingerprint-card">
+        <div class="fingerprint-lbl">Fraud Risk</div>
+        <div class="fingerprint-val" style="color: {% if candidate.fraud_score >= 40 %}var(--danger){% elif candidate.fraud_score >= 20 %}var(--warning){% else %}var(--success){% endif %};">{{ candidate.fraud_score }}%</div>
+      </div>
+      <div class="fingerprint-card">
+        <div class="fingerprint-lbl">Communication</div>
+        <div class="fingerprint-val" style="color: {% if candidate.communication_score >= 80 %}var(--success){% elif candidate.communication_score >= 50 %}var(--warning){% else %}var(--danger){% endif %};">{{ candidate.communication_score }}%</div>
+      </div>
+      <div class="fingerprint-card">
+        <div class="fingerprint-lbl">Tech Depth</div>
+        <div class="fingerprint-val" style="color: {% if candidate.tech_depth_score >= 80 %}var(--success){% elif candidate.tech_depth_score >= 50 %}var(--warning){% else %}var(--danger){% endif %};">{{ candidate.tech_depth_score }}%</div>
+      </div>
+      <div class="fingerprint-card">
+        <div class="fingerprint-lbl">Learning Ability</div>
+        <div class="fingerprint-val" style="color: {% if candidate.learning_score >= 80 %}var(--success){% elif candidate.learning_score >= 50 %}var(--warning){% else %}var(--danger){% endif %};">{{ candidate.learning_score }}%</div>
+      </div>
+    </div>
     
     <div>
-      <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1px;">Extracted Skills</h4>
+      <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1px; margin-top: 15px;">Extracted Skills</h4>
       <div class="skills-grid">
         {% for skill in candidate.get_skills_list %}
           <span class="skill-badge">{{ skill }}</span>
@@ -362,6 +455,58 @@
         {% endfor %}
       </div>
       <p style="color: var(--text-secondary); font-size: 13px; margin-top: 6px;">Experience Level: <strong style="color: var(--text-primary);">{{ candidate.experience_years }} Years</strong></p>
+    </div>
+
+    <!-- Explainable AI Breakdown Ledger -->
+    <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1px; margin-top: 20px; margin-bottom: 8px;">🧠 AI Score Explainability Ledger</h4>
+    <div class="explain-list" style="margin-bottom: 20px;">
+      {% for item in candidate.get_explain_positive_list %}
+        <div class="explain-item explain-pos">
+          <i data-lucide="plus-circle" style="width: 14px; height: 14px; color: var(--success); flex-shrink: 0;"></i>
+          <span>{{ item }}</span>
+        </div>
+      {% empty %}
+        <div class="explain-item explain-pos" style="font-weight: normal; color: var(--text-tertiary);">No positive markers compiled</div>
+      {% endfor %}
+      {% for item in candidate.get_explain_negative_list %}
+        <div class="explain-item explain-neg">
+          <i data-lucide="minus-circle" style="width: 14px; height: 14px; color: var(--danger); flex-shrink: 0;"></i>
+          <span>{{ item }}</span>
+        </div>
+      {% empty %}
+        <div class="explain-item explain-neg" style="font-weight: normal; color: var(--text-tertiary); background: transparent; border-left: none; padding-left: 0;">No negative impact flags raised</div>
+      {% endfor %}
+    </div>
+
+    <!-- Company Fit Stress Test -->
+    <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1px; margin-top: 20px;">🧪 Target Company ATS Stress Test</h4>
+    <div class="stress-grid" style="margin-bottom: 20px;">
+      <div class="stress-row" id="stress-google-{{ candidate.id }}">
+        <span class="stress-company">Google</span>
+        <div class="stress-progress-bg"><div class="stress-progress-bar" style="width: 0%;"></div></div>
+        <span style="font-size: 11.5px; font-weight: 700; width: 35px; text-align: right;" class="stress-percent">0%</span>
+      </div>
+      <div class="stress-row" id="stress-amazon-{{ candidate.id }}">
+        <span class="stress-company">Amazon</span>
+        <div class="stress-progress-bg"><div class="stress-progress-bar" style="width: 0%;"></div></div>
+        <span style="font-size: 11.5px; font-weight: 700; width: 35px; text-align: right;" class="stress-percent">0%</span>
+      </div>
+      <div class="stress-row" id="stress-stripe-{{ candidate.id }}">
+        <span class="stress-company">Stripe</span>
+        <div class="stress-progress-bg"><div class="stress-progress-bar" style="width: 0%;"></div></div>
+        <span style="font-size: 11.5px; font-weight: 700; width: 35px; text-align: right;" class="stress-percent">0%</span>
+      </div>
+      <div class="stress-row" id="stress-microsoft-{{ candidate.id }}">
+        <span class="stress-company">Microsoft</span>
+        <div class="stress-progress-bg"><div class="stress-progress-bar" style="width: 0%;"></div></div>
+        <span style="font-size: 11.5px; font-weight: 700; width: 35px; text-align: right;" class="stress-percent">0%</span>
+      </div>
+      <div class="stress-row" id="stress-zoho-{{ candidate.id }}">
+        <span class="stress-company">Zoho</span>
+        <div class="stress-progress-bg"><div class="stress-progress-bar" style="width: 0%;"></div></div>
+        <span style="font-size: 11.5px; font-weight: 700; width: 35px; text-align: right;" class="stress-percent">0%</span>
+      </div>
+      <span id="raw-stress-scores-{{ candidate.id }}" style="display: none;">{{ candidate.stress_test_scores }}</span>
     </div>
 
     <!-- What is Impressive & Requirements Needed Split -->
@@ -435,7 +580,174 @@
   </div>
 {% endfor %}
 
+<!-- Battle Float Action Button -->
+<button id="launch-battle-btn" class="battle-float-btn" onclick="openBattleModal()">
+  <i data-lucide="swords" style="width: 18px; height: 18px;"></i> <span>⚔️ Launch Candidate Battle</span> (<span id="battle-count">0</span>/2)
+</button>
+
+<!-- Battle Modal Overlay -->
+<div id="battle-modal-overlay" class="battle-modal-overlay" onclick="closeBattleModal(event)">
+  <div class="battle-modal" onclick="event.stopPropagation()">
+    <div class="flex-between" style="border-bottom: 1px solid var(--glass-border); padding-bottom: 12px; margin-bottom: 16px;">
+      <h2 style="font-size: 20px; font-weight: 800; display: flex; align-items: center; gap: 10px; color: var(--accent-purple); margin: 0;">
+        <i data-lucide="swords" style="width: 22px; height: 22px;"></i> Head-to-Head Candidate Battle
+      </h2>
+      <button class="battle-close" onclick="closeBattleModal(event)">
+        <i data-lucide="x" style="width: 24px; height: 24px;"></i>
+      </button>
+    </div>
+    <div class="battle-grid" id="battle-content-grid">
+      <!-- Populated dynamically via JavaScript -->
+    </div>
+  </div>
+</div>
+
 <script>
+  function toggleBlindMode() {
+    document.body.classList.toggle('blind-active');
+    const btn = document.getElementById('blind-toggle-btn');
+    const label = btn.querySelector('span');
+    if (document.body.classList.contains('blind-active')) {
+      label.innerText = 'Blind Mode: On';
+      btn.style.borderColor = 'var(--success)';
+      btn.style.color = 'var(--success)';
+    } else {
+      label.innerText = 'Blind Mode: Off';
+      btn.style.borderColor = 'var(--accent-cyan)';
+      btn.style.color = 'var(--accent-cyan)';
+    }
+  }
+
+  let selectedBattleCandidates = [];
+
+  function handleBattleCheckbox(event, checkbox) {
+    event.stopPropagation(); // Prevent selecting the candidate card
+    const id = checkbox.value;
+    if (checkbox.checked) {
+      if (selectedBattleCandidates.length >= 2) {
+        alert("You can only compare a maximum of 2 candidates at a time.");
+        checkbox.checked = false;
+        return;
+      }
+      selectedBattleCandidates.push(id);
+    } else {
+      selectedBattleCandidates = selectedBattleCandidates.filter(cId => cId !== id);
+    }
+    updateBattleFloatButton();
+  }
+
+  function updateBattleFloatButton() {
+    const btn = document.getElementById('launch-battle-btn');
+    const countSpan = document.getElementById('battle-count');
+    countSpan.innerText = selectedBattleCandidates.length;
+    if (selectedBattleCandidates.length === 2) {
+      btn.classList.add('show');
+    } else {
+      btn.classList.remove('show');
+    }
+  }
+
+  function openBattleModal() {
+    if (selectedBattleCandidates.length !== 2) return;
+    const idA = selectedBattleCandidates[0];
+    const idB = selectedBattleCandidates[1];
+    
+    const detailDataA = document.getElementById('cand-detail-data-' + idA);
+    const detailDataB = document.getElementById('cand-detail-data-' + idB);
+    
+    if (!detailDataA || !detailDataB) return;
+    
+    const nameA = detailDataA.querySelector('h2').innerText;
+    const nameB = detailDataB.querySelector('h2').innerText;
+    
+    const scoreA = parseInt(detailDataA.querySelector('.circle-chart__percent').innerText);
+    const scoreB = parseInt(detailDataB.querySelector('.circle-chart__percent').innerText);
+    
+    const skillsA = detailDataA.querySelector('.skills-grid').innerHTML;
+    const skillsB = detailDataB.querySelector('.skills-grid').innerHTML;
+    
+    const expA = detailDataA.querySelector('.skills-grid + p strong').innerText;
+    const expB = detailDataB.querySelector('.skills-grid + p strong').innerText;
+    
+    const summaryA = detailDataA.querySelector('[id^="raw-stress-scores-"]').previousElementSibling.previousElementSibling.querySelector('span').innerText;
+    const summaryB = detailDataB.querySelector('[id^="raw-stress-scores-"]').previousElementSibling.previousElementSibling.querySelector('span').innerText;
+    
+    const fingerprintA = detailDataA.querySelector('.fingerprint-grid').innerHTML;
+    const fingerprintB = detailDataB.querySelector('.fingerprint-grid').innerHTML;
+    
+    const winnerA = scoreA >= scoreB;
+    const winnerB = scoreB >= scoreA;
+    
+    const gridHtml = `
+      <div class="battle-column ${winnerA ? 'winner' : ''}">
+        ${winnerA ? '<div class="winner-ribbon">👑 Winner</div>' : ''}
+        <h3 class="redact-text" style="font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 8px;">${nameA}</h3>
+        <div style="font-size: 38px; font-weight: 800; text-align: center; color: var(--accent-cyan); margin-bottom: 12px;">${scoreA}%</div>
+        
+        <div style="padding: 10px; background: rgba(255,255,255,0.02); border-radius: 8px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.4; border-left: 2px solid var(--accent-blue); margin-bottom: 15px;">
+          <strong>AI Summary:</strong><br><span class="redact-text">${summaryA}</span>
+        </div>
+        
+        <div style="margin-bottom: 12px;">
+          <strong style="font-size: 11px; text-transform: uppercase; color: var(--text-tertiary);">Experience Years</strong>
+          <div style="font-weight: 700; font-size: 14px; margin-top: 4px;">${expA}</div>
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+          <strong style="font-size: 11px; text-transform: uppercase; color: var(--text-tertiary); display: block; margin-bottom: 6px;">Extracted Skills</strong>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px;">${skillsA}</div>
+        </div>
+        
+        <div style="border-top: 1px solid var(--glass-border); padding-top: 15px;">
+          <strong style="font-size: 11px; text-transform: uppercase; color: var(--text-tertiary); display: block; margin-bottom: 10px;">Digital Fingerprint</strong>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;">
+            ${fingerprintA}
+          </div>
+        </div>
+      </div>
+      
+      <div class="battle-vs-divider">
+        <div class="vs-badge">VS</div>
+        <div style="height: 100%; width: 1px; background: linear-gradient(180deg, var(--glass-border) 0%, var(--accent-purple) 50%, var(--glass-border) 100%);"></div>
+      </div>
+      
+      <div class="battle-column ${winnerB ? 'winner' : ''}">
+        ${winnerB ? '<div class="winner-ribbon">👑 Winner</div>' : ''}
+        <h3 class="redact-text" style="font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 8px;">${nameB}</h3>
+        <div style="font-size: 38px; font-weight: 800; text-align: center; color: var(--accent-cyan); margin-bottom: 12px;">${scoreB}%</div>
+        
+        <div style="padding: 10px; background: rgba(255,255,255,0.02); border-radius: 8px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.4; border-left: 2px solid var(--accent-blue); margin-bottom: 15px;">
+          <strong>AI Summary:</strong><br><span class="redact-text">${summaryB}</span>
+        </div>
+        
+        <div style="margin-bottom: 12px;">
+          <strong style="font-size: 11px; text-transform: uppercase; color: var(--text-tertiary);">Experience Years</strong>
+          <div style="font-weight: 700; font-size: 14px; margin-top: 4px;">${expB}</div>
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+          <strong style="font-size: 11px; text-transform: uppercase; color: var(--text-tertiary); display: block; margin-bottom: 6px;">Extracted Skills</strong>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px;">${skillsB}</div>
+        </div>
+        
+        <div style="border-top: 1px solid var(--glass-border); padding-top: 15px;">
+          <strong style="font-size: 11px; text-transform: uppercase; color: var(--text-tertiary); display: block; margin-bottom: 10px;">Digital Fingerprint</strong>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;">
+            ${fingerprintB}
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.getElementById('battle-content-grid').innerHTML = gridHtml;
+    document.getElementById('battle-modal-overlay').classList.add('active');
+    lucide.createIcons();
+  }
+
+  function closeBattleModal(event) {
+    document.getElementById('battle-modal-overlay').classList.remove('active');
+  }
+
   function updateFileLabel(input) {
     const fileCountDiv = document.getElementById('file-count');
     if (input.files.length > 0) {
@@ -457,10 +769,8 @@
 
   function applyRoleTemplate(roleKey) {
     if (roleKey === 'custom' || !roleTemplates[roleKey]) return;
-    
     const template = roleTemplates[roleKey];
     document.getElementById('skills_required').value = template.skills;
-    
     const expInput = document.getElementById('min_experience');
     expInput.value = template.experience;
     expInput.nextElementSibling.innerText = template.experience + ' yrs';
@@ -468,36 +778,29 @@
 
   function handleSearch(query) {
     const term = query.toLowerCase().trim();
-    
-    // Select all candidate rows
     const rows = document.querySelectorAll('.candidate-row');
-    
     rows.forEach(row => {
       const nameHeader = row.querySelector('.candidate-meta h3');
       if (!nameHeader) return;
-      
       const name = nameHeader.textContent.toLowerCase();
       if (name.includes(term)) {
-        row.style.display = 'flex'; // show matching row
+        row.style.display = 'flex';
       } else {
-        row.style.display = 'none'; // hide non-matching row
+        row.style.display = 'none';
       }
     });
     
-    // Hide lists headers/sections if all of their children are hidden
     document.querySelectorAll('.candidates-list').forEach(list => {
       const children = Array.from(list.querySelectorAll('.candidate-row'));
       const visibleChildren = children.filter(child => child.style.display !== 'none');
       const sectionDiv = list.parentElement;
-      
       if (visibleChildren.length === 0 && term !== '') {
-        sectionDiv.style.display = 'none'; // hide entire category section if no matches
+        sectionDiv.style.display = 'none';
       } else {
-        sectionDiv.style.display = 'block'; // show section
+        sectionDiv.style.display = 'block';
       }
     });
 
-    // Auto-select the first visible candidate in search results
     const firstVisible = Array.from(rows).find(row => row.style.display !== 'none');
     if (firstVisible) {
       const idMatch = firstVisible.id.match(/cand-tab-(\d+)/);
@@ -508,7 +811,6 @@
   }
 
   function selectCandidate(id) {
-    // Highlight selected card
     document.querySelectorAll('.candidate-row').forEach(row => {
       row.classList.remove('active');
     });
@@ -517,18 +819,41 @@
       selectedTab.classList.add('active');
     }
     
-    // Copy the HTML data into the display container
     const detailData = document.getElementById('cand-detail-data-' + id);
     const displayPanel = document.getElementById('detail-display-panel');
     if (detailData && displayPanel) {
       displayPanel.innerHTML = detailData.innerHTML;
-      lucide.createIcons(); // re-initialize SVGs inside display
+      lucide.createIcons();
+      
+      // Animate stress test bars dynamically
+      const stressRawSpan = displayPanel.querySelector('[id^="raw-stress-scores-"]');
+      if (stressRawSpan) {
+        const rawText = stressRawSpan.innerText;
+        const parts = rawText.split('||');
+        parts.forEach(p => {
+          const keyVal = p.split(':');
+          if (keyVal.length === 2) {
+            const company = keyVal[0].toLowerCase();
+            const score = parseInt(keyVal[1]) || 0;
+            
+            const companyRow = displayPanel.querySelector(`#stress-${company}-${id}`);
+            if (companyRow) {
+              const bar = companyRow.querySelector('.stress-progress-bar');
+              const pct = companyRow.querySelector('.stress-percent');
+              if (bar && pct) {
+                setTimeout(() => {
+                  bar.style.width = score + '%';
+                  pct.innerText = score + '%';
+                }, 150);
+              }
+            }
+          }
+        });
+      }
     }
   }
 
-  // Pre-load the first candidate detail on window load
   window.addEventListener('DOMContentLoaded', () => {
-    // Find active tab
     const activeTab = document.querySelector('.candidate-row.active');
     if (activeTab) {
       const match = activeTab.id.match(/cand-tab-(\d+)/);
@@ -536,7 +861,6 @@
         selectCandidate(match[1]);
       }
     } else {
-      // fallback to first candidate if no active exists
       const firstTab = document.querySelector('.candidate-row');
       if (firstTab) {
         const match = firstTab.id.match(/cand-tab-(\d+)/);

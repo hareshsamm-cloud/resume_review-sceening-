@@ -120,6 +120,101 @@
       </div>
     </div>
 
+    <!-- Fingerprint and Explainability columns -->
+    {% if candidate %}
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 40px; align-items: start;">
+        <div class="glass-card">
+          <h3 class="section-title" style="color: var(--accent-cyan); display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 16px;">
+            <i data-lucide="shield-check" style="width: 20px; height: 20px; color: var(--accent-cyan);"></i>
+            Digital Resume Fingerprint
+          </h3>
+          <!-- Digital Fingerprint Scoreboard -->
+          <div class="fingerprint-grid" style="margin-top: 0; margin-bottom: 20px;">
+            <div class="fingerprint-card">
+              <div class="fingerprint-lbl">Layout Quality</div>
+              <div class="fingerprint-val" style="color: {% if candidate.quality_score >= 80 %}var(--success){% elif candidate.quality_score >= 50 %}var(--warning){% else %}var(--danger){% endif %};">{{ candidate.quality_score }}%</div>
+            </div>
+            <div class="fingerprint-card">
+              <div class="fingerprint-lbl">Authenticity</div>
+              <div class="fingerprint-val" style="color: {% if candidate.authenticity_score >= 80 %}var(--success){% elif candidate.authenticity_score >= 50 %}var(--warning){% else %}var(--danger){% endif %};">{{ candidate.authenticity_score }}%</div>
+            </div>
+            <div class="fingerprint-card">
+              <div class="fingerprint-lbl">Fraud Risk</div>
+              <div class="fingerprint-val" style="color: {% if candidate.fraud_score >= 40 %}var(--danger){% elif candidate.fraud_score >= 20 %}var(--warning){% else %}var(--success){% endif %};">{{ candidate.fraud_score }}%</div>
+            </div>
+            <div class="fingerprint-card">
+              <div class="fingerprint-lbl">Communication</div>
+              <div class="fingerprint-val" style="color: {% if candidate.communication_score >= 80 %}var(--success){% elif candidate.communication_score >= 50 %}var(--warning){% else %}var(--danger){% endif %};">{{ candidate.communication_score }}%</div>
+            </div>
+            <div class="fingerprint-card">
+              <div class="fingerprint-lbl">Tech Depth</div>
+              <div class="fingerprint-val" style="color: {% if candidate.tech_depth_score >= 80 %}var(--success){% elif candidate.tech_depth_score >= 50 %}var(--warning){% else %}var(--danger){% endif %};">{{ candidate.tech_depth_score }}%</div>
+            </div>
+            <div class="fingerprint-card">
+              <div class="fingerprint-lbl">Learning Ability</div>
+              <div class="fingerprint-val" style="color: {% if candidate.learning_score >= 80 %}var(--success){% elif candidate.learning_score >= 50 %}var(--warning){% else %}var(--danger){% endif %};">{{ candidate.learning_score }}%</div>
+            </div>
+          </div>
+          
+          <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1px; margin-top: 15px; margin-bottom: 8px;">🧠 AI Score Explainability Ledger</h4>
+          <div class="explain-list">
+            {% for item in candidate.get_explain_positive_list %}
+              <div class="explain-item explain-pos">
+                <i data-lucide="plus-circle" style="width: 14px; height: 14px; color: var(--success); flex-shrink: 0;"></i>
+                <span>{{ item }}</span>
+              </div>
+            {% empty %}
+              <div class="explain-item explain-pos" style="font-weight: normal; color: var(--text-tertiary);">No positive markers compiled</div>
+            {% endfor %}
+            {% for item in candidate.get_explain_negative_list %}
+              <div class="explain-item explain-neg">
+                <i data-lucide="minus-circle" style="width: 14px; height: 14px; color: var(--danger); flex-shrink: 0;"></i>
+                <span>{{ item }}</span>
+              </div>
+            {% empty %}
+              <div class="explain-item explain-neg" style="font-weight: normal; color: var(--text-tertiary); background: transparent; border-left: none; padding-left: 0;">No negative impact flags raised</div>
+            {% endfor %}
+          </div>
+        </div>
+        
+        <div class="glass-card">
+          <h3 class="section-title" style="color: var(--accent-cyan); display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 16px;">
+            <i data-lucide="activity" style="width: 20px; height: 20px; color: var(--accent-cyan);"></i>
+            Company Fit ATS Stress Test
+          </h3>
+          <!-- Company Fit Stress Test -->
+          <div class="stress-grid" style="margin-top: 0;">
+            <div class="stress-row" id="stress-google-stud">
+              <span class="stress-company">Google</span>
+              <div class="stress-progress-bg"><div class="stress-progress-bar" style="width: 0%;" id="stress-google-bar"></div></div>
+              <span style="font-size: 11.5px; font-weight: 700; width: 35px; text-align: right;" id="stress-google-pct">0%</span>
+            </div>
+            <div class="stress-row" id="stress-amazon-stud">
+              <span class="stress-company">Amazon</span>
+              <div class="stress-progress-bg"><div class="stress-progress-bar" style="width: 0%;" id="stress-amazon-bar"></div></div>
+              <span style="font-size: 11.5px; font-weight: 700; width: 35px; text-align: right;" id="stress-amazon-pct">0%</span>
+            </div>
+            <div class="stress-row" id="stress-stripe-stud">
+              <span class="stress-company">Stripe</span>
+              <div class="stress-progress-bg"><div class="stress-progress-bar" style="width: 0%;" id="stress-stripe-bar"></div></div>
+              <span style="font-size: 11.5px; font-weight: 700; width: 35px; text-align: right;" id="stress-stripe-pct">0%</span>
+            </div>
+            <div class="stress-row" id="stress-microsoft-stud">
+              <span class="stress-company">Microsoft</span>
+              <div class="stress-progress-bg"><div class="stress-progress-bar" style="width: 0%;" id="stress-microsoft-bar"></div></div>
+              <span style="font-size: 11.5px; font-weight: 700; width: 35px; text-align: right;" id="stress-microsoft-pct">0%</span>
+            </div>
+            <div class="stress-row" id="stress-zoho-stud">
+              <span class="stress-company">Zoho</span>
+              <div class="stress-progress-bg"><div class="stress-progress-bar" style="width: 0%;" id="stress-zoho-bar"></div></div>
+              <span style="font-size: 11.5px; font-weight: 700; width: 35px; text-align: right;" id="stress-zoho-pct">0%</span>
+            </div>
+            <span id="raw-stress-scores-student" style="display: none;">{{ candidate.stress_test_scores }}</span>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
     <!-- Target Role Selection Dropdown -->
     <div class="glass-card" style="margin-bottom: 30px;">
       <form method="POST" id="role-selector-form">
@@ -254,5 +349,30 @@
       fileNameDiv.style.display = 'none';
     }
   }
+
+  // Parse and animate company stress tests for the student
+  window.addEventListener('DOMContentLoaded', () => {
+    const rawSpan = document.getElementById('raw-stress-scores-student');
+    if (rawSpan) {
+      const rawText = rawSpan.innerText;
+      const parts = rawText.split('||');
+      parts.forEach(p => {
+        const keyVal = p.split(':');
+        if (keyVal.length === 2) {
+          const company = keyVal[0].toLowerCase();
+          const score = parseInt(keyVal[1]) || 0;
+          
+          const bar = document.getElementById(`stress-${company}-bar`);
+          const pct = document.getElementById(`stress-${company}-pct`);
+          if (bar && pct) {
+            setTimeout(() => {
+              bar.style.width = score + '%';
+              pct.innerText = score + '%';
+            }, 200);
+          }
+        }
+      });
+    }
+  });
 </script>
 {% endblock %}
