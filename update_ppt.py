@@ -302,8 +302,14 @@ try:
         p.font.color.rgb = RGBColor(255, 255, 255)
         p.font.name = "Outfit"
         
-    # Style Improvement Card 0
+    # Re-create and style Improvement Card 0 (removes template theme overrides)
     if ic0:
+        left, top, width, height = ic0.left, ic0.top, ic0.width, ic0.height
+        sp = ic0._element
+        sp.getparent().remove(sp)
+        
+        ic0 = slide3.shapes.add_shape(1, left, top, width, height)
+        ic0.name = 'ImprovementCard_0'
         ic0.fill.solid()
         ic0.fill.fore_color.rgb = RGBColor(17, 21, 44)
         set_shape_transparency(ic0, 0.40)
@@ -337,8 +343,14 @@ try:
             p_pt.font.color.rgb = RGBColor(200, 210, 225)
             p_pt.font.name = "Outfit"
             
-    # Style Improvement Card 1
+    # Re-create and style Improvement Card 1
     if ic1:
+        left, top, width, height = ic1.left, ic1.top, ic1.width, ic1.height
+        sp = ic1._element
+        sp.getparent().remove(sp)
+        
+        ic1 = slide3.shapes.add_shape(1, left, top, width, height)
+        ic1.name = 'ImprovementCard_1'
         ic1.fill.solid()
         ic1.fill.fore_color.rgb = RGBColor(17, 21, 44)
         set_shape_transparency(ic1, 0.40)
@@ -372,8 +384,14 @@ try:
             p_pt.font.color.rgb = RGBColor(200, 210, 225)
             p_pt.font.name = "Outfit"
 
-    # Style Improvement Card 2
+    # Re-create and style Improvement Card 2
     if ic2:
+        left, top, width, height = ic2.left, ic2.top, ic2.width, ic2.height
+        sp = ic2._element
+        sp.getparent().remove(sp)
+        
+        ic2 = slide3.shapes.add_shape(1, left, top, width, height)
+        ic2.name = 'ImprovementCard_2'
         ic2.fill.solid()
         ic2.fill.fore_color.rgb = RGBColor(17, 21, 44)
         set_shape_transparency(ic2, 0.40)
@@ -434,8 +452,14 @@ try:
         p.font.color.rgb = RGBColor(255, 255, 255)
         p.font.name = "Outfit"
         
-    # Update Card 0
+    # Re-create and style Card 0 (removes template theme overrides)
     if card0:
+        left, top, width, height = card0.left, card0.top, card0.width, card0.height
+        sp = card0._element
+        sp.getparent().remove(sp)
+        
+        card0 = slide4.shapes.add_shape(1, left, top, width, height)
+        card0.name = 'JourneyCard_0'
         card0.fill.solid()
         card0.fill.fore_color.rgb = RGBColor(17, 21, 44)
         set_shape_transparency(card0, 0.40)
@@ -469,8 +493,14 @@ try:
             p_pt.font.color.rgb = RGBColor(200, 210, 225)
             p_pt.font.name = "Outfit"
             
-    # Update Card 1
+    # Re-create and style Card 1
     if card1:
+        left, top, width, height = card1.left, card1.top, card1.width, card1.height
+        sp = card1._element
+        sp.getparent().remove(sp)
+        
+        card1 = slide4.shapes.add_shape(1, left, top, width, height)
+        card1.name = 'JourneyCard_1'
         card1.fill.solid()
         card1.fill.fore_color.rgb = RGBColor(17, 21, 44)
         set_shape_transparency(card1, 0.40)
@@ -504,8 +534,14 @@ try:
             p_pt.font.color.rgb = RGBColor(200, 210, 225)
             p_pt.font.name = "Outfit"
 
-    # Update Card 2
+    # Re-create and style Card 2
     if card2:
+        left, top, width, height = card2.left, card2.top, card2.width, card2.height
+        sp = card2._element
+        sp.getparent().remove(sp)
+        
+        card2 = slide4.shapes.add_shape(1, left, top, width, height)
+        card2.name = 'JourneyCard_2'
         card2.fill.solid()
         card2.fill.fore_color.rgb = RGBColor(17, 21, 44)
         set_shape_transparency(card2, 0.40)
