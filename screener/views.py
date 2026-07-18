@@ -43,10 +43,48 @@ for key, val in sorted_roles:
         "experience": str(val["experience"])
     }
 
+def auto_seed_default_accounts():
+    """
+    Ensures standard hackathon credentials exist permanently in the database.
+    """
+    try:
+        # 1. Recruiter Account
+        if not RecruiterAccount.objects.filter(username="recruiter").exists():
+            RecruiterAccount.objects.create(
+                username="recruiter",
+                email="recruiter@gmail.com",
+                password=make_password("password123")
+            )
+            
+        # 2. Student Accounts
+        if not StudentAccount.objects.filter(username="student").exists():
+            StudentAccount.objects.create(
+                username="student",
+                email="student@gmail.com",
+                password=make_password("password123")
+            )
+        if not StudentAccount.objects.filter(username="sarah").exists():
+            StudentAccount.objects.create(
+                username="sarah",
+                email="sarah.jenkins@stanford.edu",
+                password=make_password("password123")
+            )
+            
+        # 3. College Admin Account
+        if not CollegeAccount.objects.filter(username="college").exists():
+            CollegeAccount.objects.create(
+                username="college",
+                email="college@gmail.com",
+                password=make_password("password123")
+            )
+    except Exception as e:
+        print(f"Error seeding default accounts: {e}")
+
 def landing_view(request):
     """
     Renders the portal entrance page.
     """
+    auto_seed_default_accounts()
     return render(request, 'screener/landing.html')
 
 def recruiter_dashboard(request):
@@ -1071,6 +1109,7 @@ def signup_view(request):
 
 
 def login_view(request):
+    auto_seed_default_accounts()
     role = request.GET.get('role', 'recruiter')
     if request.method == 'POST':
         role = request.POST.get('role', 'recruiter')
