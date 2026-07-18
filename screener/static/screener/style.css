@@ -455,6 +455,28 @@ body {
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
+#detail-display-panel {
+  position: sticky;
+  top: 20px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+#detail-display-panel::-webkit-scrollbar {
+  width: 6px;
+}
+#detail-display-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+#detail-display-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+#detail-display-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 /* Detail Card view styling */
 .detail-header {
   display: flex;
