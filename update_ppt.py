@@ -38,6 +38,31 @@ try:
     # -------------------------------------------------------------
     slide1 = prs.slides[0]
     
+    # 1. Clean up any existing Title box we added on Slide 1
+    for shape in list(slide1.shapes):
+        if shape.name == "TopicTitleBox":
+            sp = shape._element
+            sp.getparent().remove(sp)
+            
+    # 2. Add Topic Title box
+    title_box = slide1.shapes.add_textbox(Inches(1.0), Inches(1.0), Inches(18.0), Inches(2.2))
+    title_box.name = "TopicTitleBox"
+    tf = title_box.text_frame
+    tf.word_wrap = True
+    p1 = tf.paragraphs[0]
+    p1.text = "Topic: ResumeSphere AI"
+    p1.font.bold = True
+    p1.font.size = Pt(48)
+    p1.font.color.rgb = RGBColor(255, 255, 255)
+    p1.font.name = "Outfit"
+    p1.space_after = Pt(10)
+    
+    p2 = tf.add_paragraph()
+    p2.text = "Next-Gen Multi-Portal Resume Screener, Integrity Auditor & Career Path Recommendation System"
+    p2.font.size = Pt(22)
+    p2.font.color.rgb = RGBColor(6, 182, 212) # Cyan accent
+    p2.font.name = "Outfit"
+    
     tb13 = None
     tb14 = None
     for shape in slide1.shapes:
@@ -250,6 +275,299 @@ try:
             p_pt.space_after = Pt(10)
             p_pt.font.color.rgb = RGBColor(200, 210, 225)
             
+    # -------------------------------------------------------------
+    # SLIDE 3: Improvements Made After Review 1
+    # -------------------------------------------------------------
+    slide3 = prs.slides[2]
+    tb3_title = None
+    ic0 = None
+    ic1 = None
+    ic2 = None
+    for shape in slide3.shapes:
+        if shape.name == 'TextBox 3':
+            tb3_title = shape
+        elif shape.name == 'ImprovementCard_0':
+            ic0 = shape
+        elif shape.name == 'ImprovementCard_1':
+            ic1 = shape
+        elif shape.name == 'ImprovementCard_2':
+            ic2 = shape
+            
+    if tb3_title:
+        tb3_title.text_frame.clear()
+        p = tb3_title.text_frame.paragraphs[0]
+        p.text = "Improvements Made After Review 1"
+        p.font.bold = True
+        p.font.size = Pt(36)
+        p.font.color.rgb = RGBColor(255, 255, 255)
+        p.font.name = "Outfit"
+        
+    # Style Improvement Card 0
+    if ic0:
+        ic0.fill.solid()
+        ic0.fill.fore_color.rgb = RGBColor(17, 21, 44)
+        set_shape_transparency(ic0, 0.40)
+        ic0.line.color.rgb = RGBColor(59, 130, 246) # Blue
+        ic0.line.width = Pt(2.5)
+        
+        tf0 = ic0.text_frame
+        tf0.clear()
+        tf0.word_wrap = True
+        tf0.margin_left = Inches(0.25)
+        tf0.margin_right = Inches(0.25)
+        tf0.margin_top = Inches(0.35)
+        
+        p_hdr = tf0.paragraphs[0]
+        p_hdr.text = "01 | Dynamic Recalculation Engine"
+        p_hdr.font.bold = True
+        p_hdr.font.size = Pt(19)
+        p_hdr.font.color.rgb = RGBColor(59, 130, 246)
+        p_hdr.space_after = Pt(14)
+        
+        points = [
+            "Replaced static matching with real-time scoring audits.",
+            "Toggling experience sliders or templates recalculates all matches instantly.",
+            "Fully preserves state using Django session cache parameters."
+        ]
+        for pt in points:
+            p_pt = tf0.add_paragraph()
+            p_pt.text = f"• {pt}"
+            p_pt.font.size = Pt(13.5)
+            p_pt.space_after = Pt(10)
+            p_pt.font.color.rgb = RGBColor(200, 210, 225)
+            p_pt.font.name = "Outfit"
+            
+    # Style Improvement Card 1
+    if ic1:
+        ic1.fill.solid()
+        ic1.fill.fore_color.rgb = RGBColor(17, 21, 44)
+        set_shape_transparency(ic1, 0.40)
+        ic1.line.color.rgb = RGBColor(139, 92, 246) # Purple
+        ic1.line.width = Pt(2.5)
+        
+        tf1 = ic1.text_frame
+        tf1.clear()
+        tf1.word_wrap = True
+        tf1.margin_left = Inches(0.25)
+        tf1.margin_right = Inches(0.25)
+        tf1.margin_top = Inches(0.35)
+        
+        p_hdr = tf1.paragraphs[0]
+        p_hdr.text = "02 | 16-Tier Anomaly & Fraud Audit"
+        p_hdr.font.bold = True
+        p_hdr.font.size = Pt(19)
+        p_hdr.font.color.rgb = RGBColor(139, 92, 246)
+        p_hdr.space_after = Pt(14)
+        
+        points = [
+            "Detects keyword stuffing (>20 skills) and duplicate word loops.",
+            "Flags certification timeline release gaps (e.g. React in 2008).",
+            "Identifies multi-stack tech domain conflicts and blank metadata."
+        ]
+        for pt in points:
+            p_pt = tf1.add_paragraph()
+            p_pt.text = f"• {pt}"
+            p_pt.font.size = Pt(13.5)
+            p_pt.space_after = Pt(10)
+            p_pt.font.color.rgb = RGBColor(200, 210, 225)
+            p_pt.font.name = "Outfit"
+
+    # Style Improvement Card 2
+    if ic2:
+        ic2.fill.solid()
+        ic2.fill.fore_color.rgb = RGBColor(17, 21, 44)
+        set_shape_transparency(ic2, 0.40)
+        ic2.line.color.rgb = RGBColor(16, 185, 129) # Green
+        ic2.line.width = Pt(2.5)
+        
+        tf2 = ic2.text_frame
+        tf2.clear()
+        tf2.word_wrap = True
+        tf2.margin_left = Inches(0.25)
+        tf2.margin_right = Inches(0.25)
+        tf2.margin_top = Inches(0.35)
+        
+        p_hdr = tf2.paragraphs[0]
+        p_hdr.text = "03 | Outbox SMTP Simulator & Space"
+        p_hdr.font.bold = True
+        p_hdr.font.size = Pt(19)
+        p_hdr.font.color.rgb = RGBColor(16, 185, 129)
+        p_hdr.space_after = Pt(14)
+        
+        points = [
+            "Visual decision log captures sent offer and rejection emails.",
+            "Created offline College Placement deck with 210 companies.",
+            "Responsive searching and filtering mapped by Green, Orange, and Red tiers."
+        ]
+        for pt in points:
+            p_pt = tf2.add_paragraph()
+            p_pt.text = f"• {pt}"
+            p_pt.font.size = Pt(13.5)
+            p_pt.space_after = Pt(10)
+            p_pt.font.color.rgb = RGBColor(200, 210, 225)
+            p_pt.font.name = "Outfit"
+
+    # -------------------------------------------------------------
+    # SLIDE 4: Core Implemented Systems
+    # -------------------------------------------------------------
+    slide4 = prs.slides[3]
+    tb3 = None
+    card0 = None
+    card1 = None
+    card2 = None
+    for shape in slide4.shapes:
+        if shape.name == 'TextBox 3':
+            tb3 = shape
+        elif shape.name == 'JourneyCard_0':
+            card0 = shape
+        elif shape.name == 'JourneyCard_1':
+            card1 = shape
+        elif shape.name == 'JourneyCard_2':
+            card2 = shape
+            
+    if tb3:
+        tb3.text_frame.clear()
+        p = tb3.text_frame.paragraphs[0]
+        p.text = "ResumeSphere AI - Core Implemented Systems"
+        p.font.bold = True
+        p.font.size = Pt(36)
+        p.font.color.rgb = RGBColor(255, 255, 255)
+        p.font.name = "Outfit"
+        
+    # Update Card 0
+    if card0:
+        card0.fill.solid()
+        card0.fill.fore_color.rgb = RGBColor(17, 21, 44)
+        set_shape_transparency(card0, 0.40)
+        card0.line.color.rgb = RGBColor(59, 130, 246) # Blue
+        card0.line.width = Pt(2.5)
+        
+        tf0 = card0.text_frame
+        tf0.clear()
+        tf0.word_wrap = True
+        tf0.margin_left = Inches(0.25)
+        tf0.margin_right = Inches(0.25)
+        tf0.margin_top = Inches(0.35)
+        
+        p_hdr = tf0.paragraphs[0]
+        p_hdr.text = "01 | Multi-Portal Workspace"
+        p_hdr.font.bold = True
+        p_hdr.font.size = Pt(19)
+        p_hdr.font.color.rgb = RGBColor(59, 130, 246)
+        p_hdr.space_after = Pt(14)
+        
+        points = [
+            "Recruiter Cockpit: Visual leaderboards, bulk actions, and direct candidate processing.",
+            "Student Space: Resume upload analytics, company eligibility status, and career guidelines.",
+            "College Admin Portal: Configure blacklist limits, check fraud logs, and manage suspensions."
+        ]
+        for pt in points:
+            p_pt = tf0.add_paragraph()
+            p_pt.text = f"• {pt}"
+            p_pt.font.size = Pt(13)
+            p_pt.space_after = Pt(10)
+            p_pt.font.color.rgb = RGBColor(200, 210, 225)
+            p_pt.font.name = "Outfit"
+            
+    # Update Card 1
+    if card1:
+        card1.fill.solid()
+        card1.fill.fore_color.rgb = RGBColor(17, 21, 44)
+        set_shape_transparency(card1, 0.40)
+        card1.line.color.rgb = RGBColor(139, 92, 246) # Purple
+        card1.line.width = Pt(2.5)
+        
+        tf1 = card1.text_frame
+        tf1.clear()
+        tf1.word_wrap = True
+        tf1.margin_left = Inches(0.25)
+        tf1.margin_right = Inches(0.25)
+        tf1.margin_top = Inches(0.35)
+        
+        p_hdr = tf1.paragraphs[0]
+        p_hdr.text = "02 | Digital Resume Fingerprint"
+        p_hdr.font.bold = True
+        p_hdr.font.size = Pt(19)
+        p_hdr.font.color.rgb = RGBColor(139, 92, 246)
+        p_hdr.space_after = Pt(14)
+        
+        points = [
+            "6-Tier Anomaly Audit: Score Quality, Authenticity, Fraud, Communication, Tech Depth, and Learning.",
+            "Integrity Auditing: Hidden font parsing, background keyword stuffing detection, and email domain check.",
+            "Anti-Gaming Blocker: Automated college reports and warning thresholds preventing student profile abuse."
+        ]
+        for pt in points:
+            p_pt = tf1.add_paragraph()
+            p_pt.text = f"• {pt}"
+            p_pt.font.size = Pt(13)
+            p_pt.space_after = Pt(10)
+            p_pt.font.color.rgb = RGBColor(200, 210, 225)
+            p_pt.font.name = "Outfit"
+
+    # Update Card 2
+    if card2:
+        card2.fill.solid()
+        card2.fill.fore_color.rgb = RGBColor(17, 21, 44)
+        set_shape_transparency(card2, 0.40)
+        card2.line.color.rgb = RGBColor(16, 185, 129) # Green
+        card2.line.width = Pt(2.5)
+        
+        tf2 = card2.text_frame
+        tf2.clear()
+        tf2.word_wrap = True
+        tf2.margin_left = Inches(0.25)
+        tf2.margin_right = Inches(0.25)
+        tf2.margin_top = Inches(0.35)
+        
+        p_hdr = tf2.paragraphs[0]
+        p_hdr.text = "03 | Stress Test & Battles"
+        p_hdr.font.bold = True
+        p_hdr.font.size = Pt(19)
+        p_hdr.font.color.rgb = RGBColor(16, 185, 129)
+        p_hdr.space_after = Pt(14)
+        
+        points = [
+            "Explainability Ledger: Visual green (+)/red (-) ledger detailing points logic behind every match.",
+            "ATS Stress Testing: Programmatic evaluation maps against Google, Amazon, Stripe, Microsoft, Zoho.",
+            "Candidate Battles: Dual-column head-to-head matching overlay declaring crowned winner."
+        ]
+        for pt in points:
+            p_pt = tf2.add_paragraph()
+            p_pt.text = f"• {pt}"
+            p_pt.font.size = Pt(13)
+            p_pt.space_after = Pt(10)
+            p_pt.font.color.rgb = RGBColor(200, 210, 225)
+            p_pt.font.name = "Outfit"
+
+    # -------------------------------------------------------------
+    # SLIDE 6: Thank You details
+    # -------------------------------------------------------------
+    slide6 = prs.slides[5]
+    for shape in list(slide6.shapes):
+        if shape.name == "ThankYouSubtitle":
+            sp = shape._element
+            sp.getparent().remove(sp)
+            
+    sub_box = slide6.shapes.add_textbox(Inches(1.0), Inches(8.2), Inches(18.0), Inches(1.5))
+    sub_box.name = "ThankYouSubtitle"
+    tf6 = sub_box.text_frame
+    tf6.word_wrap = True
+    p6 = tf6.paragraphs[0]
+    p6.text = "Questions & Discussion"
+    p6.alignment = 1 # Center alignment
+    p6.font.bold = True
+    p6.font.size = Pt(24)
+    p6.font.color.rgb = RGBColor(6, 182, 212) # Cyan accent
+    p6.font.name = "Outfit"
+    p6.space_after = Pt(8)
+    
+    p6_team = tf6.add_paragraph()
+    p6_team.text = "Data Breakers Team  |  Abinav Balasubramaniam (Leader)"
+    p6_team.alignment = 1 # Center
+    p6_team.font.size = Pt(18)
+    p6_team.font.color.rgb = RGBColor(200, 210, 225)
+    p6_team.font.name = "Outfit"
+
     # Save the modified presentation
     prs.save(ppt_path)
     print("\nPowerPoint modified and saved successfully!")
